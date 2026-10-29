@@ -1,182 +1,40 @@
-<div align="center">
-
-<img 
-  src="https://github.com/user-attachments/assets/962887ec-636b-4e0f-90eb-0862c0feefca" 
-  width="72"
-/>
-
 # Void
 
-<br/>
+Void is a Windows 11 taskbar replacement. It hides the native taskbar and adds a floating dock at the bottom of the screen plus a notch at the top that adapts to what you are doing.
 
-<!-- HERO SHOWCASE — full-width cinematic shot or video -->
-<!-- ![Hero](your-hero-url) -->
-<img width="1920" height="1080" alt="Void Hero" src="https://github.com/user-attachments/assets/22041f25-a69e-457d-80d9-7dfbfbed2d29" />
+## Features
 
-<video width="1920" height="1080" src="https://github.com/user-attachments/assets/fa7f949b-d9c3-4a92-b00d-e1132c0f3ff1">
+- **Dock** — pin apps, drag to reorder, hover for window previews, fixed/smart/peek visibility modes, dock extras (drives, folders, Recycle Bin)
+- **Notch** — music player with audio visualizer, Command Center (WiFi, Bluetooth, volume, brightness), status (battery, weather), calendar with Pomodoro timer
+- **Overlays** — custom volume and brightness HUDs replace the native Windows on-screen display
+- **Settings** — full settings window with themes (dark/light/custom/adaptive), UI scale, per-app mixer, sound export/import
+- **Updates** — built-in auto-updater
+- **Tray** — restart or quit cleanly; quitting restores the native taskbar
 
-</div>
+## Getting it
 
----
+Download the latest installer from the [Releases](https://github.com/Ved2151H/Void/releases/latest) page and run `Void_x.y.z_x64-setup.exe`.
 
-Void makes your Windows desktop feel alive.
+## Building from source
 
-Every transition is a physics simulation.
-Every element responds to touch.
-Every pixel is in motion.
-
-Your desktop has been asleep for years.
-This wakes it up.
-
----
-
-## The Island
-
-<!-- SHOWCASE: GIF or short clip — Island expanding, cycling through modes (3-5s) -->
-<!-- ![Island Demo](your-island-gif-url) -->
-
-<p align="center">
-  <img width="430" height="70" alt="Void Island" src="https://github.com/user-attachments/assets/0d723558-9df4-4214-b20e-4a1f97eb1f22" />
-</p>
-
-A notch at the top of your screen that adapts to what you're doing.
-
-Scroll or swipe to switch modes.
-Watch it transform.
-
-**Music** — album art, track info, playback controls. A visualizer that reacts to five frequency bands with spring physics. It moves when the music plays.
-
-<!-- SHOWCASE: GIF — music mode reacting to a song -->
-<!-- ![Music Visualizer](your-music-gif-url) -->
-
-**Command Center** — WiFi, Bluetooth, Do Not Disturb, volume, brightness. Everything you usually dig through settings for.
-
-<!-- SHOWCASE: GIF — command center toggling controls -->
-<!-- ![Command Center](your-command-center-gif-url) -->
-
-**Status** — Battery, weather. Your desktop, summarized.
-
-**Calendar** — A month view with a Pomodoro timer. Focus without switching apps.
-
-Each transition is spring-loaded.
-Width, height, border-radius, position — all animate independently.
-It feels mechanical. In a good way.
-
----
-
-## The Dock
-
-<!-- SHOWCASE: GIF — dock appearing on hover, drag-reorder, window previews -->
-<!-- ![Dock Demo](your-dock-gif-url) -->
-
-<p align="center">
-  <img width="576" height="102" alt="Void Dock" src="https://github.com/user-attachments/assets/96229f0e-1246-4baf-b8ad-3e8f77142a12" />
-</p>
-
-A taskbar that actually moves.
-
-Void replaces your native Windows taskbar.
-It sits at the bottom of your screen, always there when you need it.
-
-Drag to reorder.
-Hover for window previews.
-Right-click for context menus.
-
-It's not an overlay.
-It _is_ your taskbar.
-
-<!-- SHOWCASE: GIF — dock hover previews in action -->
-<!-- ![Window Previews](your-preview-gif-url) -->
-
----
-
-## Under the Hood
-
-<!-- SHOWCASE: Optional — architecture diagram or visual of the 5-window system -->
-<!-- ![Architecture](your-arch-url) -->
-
-A Rust backend that speaks directly to the Windows shell.
-
-Global hooks intercepting keys before Windows sees them.
-WASAPI capturing system audio in real-time.
-COM controlling your media sessions.
-WMI monitoring your hardware.
-
-The whole thing sleeps when you don't need it.
-The audio visualizer pauses when nothing's playing.
-The cursor monitor hides when the dock is gone.
-Thumbnails only refresh on focus.
-
-It's fast because it has to be.
-
----
-
-<!-- SHOWCASE: Full-width cinematic video or GIF montage -->
-<!-- ![Void Montage](your-montage-url) -->
-
----
-
-## 🛡️ Microsoft Defender
-
-Some users may see a Microsoft Defender warning when installing Void.
-
-The executable was submitted directly to Microsoft for analysis. Microsoft reviewed the file and confirmed that it **does not meet their criteria for malware or potentially unwanted applications**, and **the detection has been removed**.
-
-<p align="center">
-  <img width="800" alt="Microsoft Security Intelligence" src="https://github.com/user-attachments/assets/67ddddde-9c68-4338-a0f2-c5645e416514" />
-</p>
-
-<details>
-<summary>Still seeing the detection?</summary>
-
-Your system may still have the previous Defender signature cached. Microsoft recommends updating your Defender security intelligence.
-
-Open **Command Prompt as Administrator** and run:
-
-```cmd
-cd "C:\Program Files\Windows Defender"
-MpCmdRun.exe -removedefinitions -dynamicsignatures
-MpCmdRun.exe -SignatureUpdate
-```
-
-</details>
-
-## Get It Running
-
-**Download** the latest build from [Releases](https://github.com/SehajveerSingh2005/bloom/releases/latest).
-
-Or build from source:
+Requirements: [Bun](https://bun.sh/), [Rust stable](https://rustup.rs/) and Visual Studio C++ build tools (Windows 10 or 11).
 
 ```bash
-git clone https://github.com/SehajveerSingh2005/bloom.git
-cd bloom
+git clone https://github.com/Ved2151H/Void.git
+cd Void
 bun install
-bun run tauri dev
+bun run tauri dev     # run it in development
+bun run build:setup   # build the installer (lands in this folder)
 ```
 
-You'll need [Rust](https://rustup.rs/) and [Bun](https://bun.sh/). That's it.
+## How it works
 
----
+A Rust backend on Tauri v2 speaks directly to the Windows shell: AppBar registration, global keyboard hooks, WASAPI audio capture, Windows Media Session COM and WMI hardware monitoring. Four webview windows handle the notch, dock, overlays and settings.
 
 ## Contributing
 
-Void is open source.
-Found a bug? Open an issue.
-Have an idea? Open a feature request first — we'll agree on the approach before you write code. See [CONTRIBUTING.md](CONTRIBUTING.md).
-Want to just say it's cool? A star goes a long way.
+Found a bug or want a feature? Open an [issue](https://github.com/Ved2151H/Void/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
-## Keep the void humming
+## License
 
-Void runs on spring physics. I run on coffee.
-
-[Buy me a coffee ↗](https://buymeacoffee.com/sehaz)
-
-Licensed under [GPLv3](LICENSE).
-
----
-
-<div align="center">
-
-**Your desktop is waiting.**
-
-</div>
+Licensed under [GPL-3.0](LICENSE).
