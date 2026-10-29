@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an idea or improvement for Void. Please discuss it here before opening a PR.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        One user problem per request, please. Search existing issues first. An open issue or automated label is not feature approval: wait for a maintainer to agree on the scope (accepted label) before implementing a larger change. Prototypes can stay in a fork or draft while discussing.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What's your idea?
+      description: Describe one user problem and the smallest change that would solve it. Explain how it fits the existing dock, notch, or controls.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Void does this relate to?
+      options:
+        - Dock
+        - Notch
+        - Media controls / now playing
+        - Overlays
+        - Settings
+        - Installer / updater / startup
+        - Not sure / everything
+    validations:
+      required: false
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Mockups or examples
+      description: Drag and drop images or links to similar apps here.
+    validations:
+      required: false
+
