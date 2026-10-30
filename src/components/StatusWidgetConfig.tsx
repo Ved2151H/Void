@@ -25,6 +25,7 @@ import {
 	MemoryStick,
 	HardDrive,
 	ArrowUpDown,
+	Circle,
 	X,
 	ArrowLeftRight,
 	ChevronUp,
@@ -60,9 +61,17 @@ const DEFAULT_CONFIG: WidgetConfig = {
 
 const MAX_PER_ZONE = 2;
 
+const resolveWidgetDef = (id: string): WidgetDef =>
+	WIDGET_DEFS.find((w) => w.id === id) ?? {
+		id,
+		label: id,
+		icon: Circle,
+		color: "#9ca3af"
+	};
+
 /* ── Draggable pool chip ── */
 function PoolChip({ id }: { id: string }) {
-	const def = WIDGET_DEFS.find((w) => w.id === id)!;
+	const def = resolveWidgetDef(id);
 	const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
 	const Icon = def.icon;
 	return (
@@ -94,7 +103,7 @@ function SortablePlacedChip({
 	onRemove: (id: string) => void;
 	onMove: (id: string, dir: -1 | 1) => void;
 }) {
-	const def = WIDGET_DEFS.find((w) => w.id === id)!;
+	const def = resolveWidgetDef(id);
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
 		id
 	});
