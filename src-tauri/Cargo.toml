@@ -66,6 +66,8 @@ windows = { version = "0.61", features = [
 	"Devices_Bluetooth_Rfcomm",
 	"Networking",
 	"Networking_Sockets",
+	"Networking_Connectivity",
+	"Networking_NetworkOperators",
 	"Devices_Enumeration",
 	"Foundation_Collections",
 	"Win32_Media_KernelStreaming",

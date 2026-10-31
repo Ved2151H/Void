@@ -4019,8 +4019,10 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                         || window_class == "ExploreWClass"
                         || (window_class == "#32770" && dialog_has_tab_control(hwnd));
 
-                    // Filter out Bloom itself (except the Settings window) and some common background processes
-                    if (lowercase_path.contains("void.exe") && title != "Settings")
+                    // Filter out Bloom itself (including the Settings window,
+                    // which must not appear as a dock icon) and some common
+                    // background processes
+                    if lowercase_path.contains("void.exe")
                         || lowercase_path.contains("conhost.exe")
                         || (lowercase_path.contains("explorer.exe") && !is_explorer_window)
                         || lowercase_path.contains("shellexperiencehost.exe")

@@ -746,6 +746,9 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 	const [btConnectedNames, setBtConnectedNames] = useState<string[]>([]);
 	const [batterySaverEnabled, setBatterySaverEnabled] = useState(false);
 	const [currentBrightness, setCurrentBrightness] = useState(50);
+	const [hotspotEnabled, setHotspotEnabled] = useState(false);
+	const [flightModeEnabled, setFlightModeEnabled] = useState(false);
+	const [dndEnabled, setDndEnabled] = useState(false);
 
 	// System metrics for status widgets
 	const [cpuUsage, setCpuUsage] = useState(0);
@@ -2568,6 +2571,18 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		return () => clearInterval(interval);
 	}, []);
 
+	useEffect(() => {
+		if (bloomMode !== "command-center") return;
+		const refreshToggleStates = () => {
+			invoke<boolean>("get_hotspot_state").then(setHotspotEnabled).catch(() => {});
+			invoke<boolean>("get_flight_mode_state").then(setFlightModeEnabled).catch(() => {});
+			invoke<boolean>("get_dnd_state").then(setDndEnabled).catch(() => {});
+		};
+		refreshToggleStates();
+		const interval = setInterval(refreshToggleStates, 4000);
+		return () => clearInterval(interval);
+	}, [bloomMode]);
+
 	// Refresh Wi-Fi status while the command center is open so changes made
 	// outside Bloom (keyboard toggle, Windows quick settings) show up.
 	useEffect(() => {
@@ -2848,15 +2863,6 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 			.catch((err) => console.error("Failed to read battery details:", err));
 	}, []);
 
-	// Battery Saver - opens settings (no public API to toggle without admin)
-	const openBatterySaverSettings = useCallback(async () => {
-		try {
-			await invoke("open_battery_saver_settings");
-		} catch (e) {
-			console.error("Failed to open Battery Saver settings:", e);
-		}
-	}, []);
-
 	// Brightness change with throttling
 	const sendBrightness = useTrailingThrottle((newVal: number) => {
 		invoke("set_brightness", { brightness: newVal }).catch(() => {});
@@ -2895,36 +2901,52 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		setBloomMode("wifi");
 	}, []);
 
-	const toggleDockModeSetting = useCallback(
+	const toggleHotspot = useCallback(
 		async (e: React.MouseEvent) => {
 			e.stopPropagation();
-			const nextMode = dockMode === "fixed" ? "smart" : dockMode === "smart" ? "peek" : "fixed";
-			setDockMode(nextMode);
-			localStorage.setItem("bloom-dock-mode", nextMode);
-			invoke("save_setting", { key: "bloom-dock-mode", value: nextMode }).catch(console.error);
+			const next = !hotspotEnabled;
+			setHotspotEnabled(next);
 			try {
-				await invoke("change_dock_mode", { mode: nextMode });
+				const actual = await invoke<boolean>("set_hotspot", { enabled: next });
+				setHotspotEnabled(actual);
 			} catch (err) {
-				console.error("Failed to change dock mode:", err);
+				console.error("Failed to toggle Mobile Hotspot:", err);
+				invoke<boolean>("get_hotspot_state").then(setHotspotEnabled).catch(() => {});
 			}
 		},
-		[dockMode]
+		[hotspotEnabled]
 	);
 
-	const toggleNotchModeSetting = useCallback(
+	const toggleFlightMode = useCallback(
 		async (e: React.MouseEvent) => {
 			e.stopPropagation();
-			const nextMode = notchMode === "fixed" ? "smart" : notchMode === "smart" ? "peek" : "fixed";
-			setNotchMode(nextMode);
-			localStorage.setItem("bloom-notch-mode", nextMode);
-			invoke("save_setting", { key: "bloom-notch-mode", value: nextMode }).catch(console.error);
+			const next = !flightModeEnabled;
+			setFlightModeEnabled(next);
 			try {
-				await invoke("change_notch_mode", { mode: nextMode });
+				const actual = await invoke<boolean>("set_flight_mode", { enabled: next });
+				setFlightModeEnabled(actual);
 			} catch (err) {
-				console.error("Failed to change notch mode:", err);
+				console.error("Failed to toggle Flight Mode:", err);
+				invoke<boolean>("get_flight_mode_state").then(setFlightModeEnabled).catch(() => {});
 			}
 		},
-		[notchMode]
+		[flightModeEnabled]
+	);
+
+	const toggleDnd = useCallback(
+		async (e: React.MouseEvent) => {
+			e.stopPropagation();
+			const next = !dndEnabled;
+			setDndEnabled(next);
+			try {
+				const actual = await invoke<boolean>("set_dnd", { enabled: next });
+				setDndEnabled(actual);
+			} catch (err) {
+				console.error("Failed to toggle Do Not Disturb:", err);
+				invoke<boolean>("get_dnd_state").then(setDndEnabled).catch(() => {});
+			}
+		},
+		[dndEnabled]
 	);
 
 	const handleBluetoothRightClick = useCallback((e: React.MouseEvent) => {
@@ -3135,7 +3157,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		if (bloomMode === "device" && deviceAlert) return 330;
 		if (isCalendarMode) return CALENDAR_PANEL_WIDTH;
 		if (bloomMode === "shelf") return 380;
-		if (bloomMode === "command-center" && isOpen) return 350;
+		if (bloomMode === "command-center" && isOpen) return CALENDAR_PANEL_WIDTH;
 		if (bloomMode === "wifi" || bloomMode === "bluetooth" || bloomMode === "devices") return CALENDAR_PANEL_WIDTH;
 		if (showMusicOnStatusHover) {
 			return 170 + (settingsVisualizerEnabled ? 30 : 0);
@@ -4017,23 +4039,18 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 													</button>
 												</div>
 
-												{/* Dock Mode Pill */}
 												<div
-													className={`cc-pill-tile ${dockMode === "fixed" ? "active" : ""}`}
-													onClick={toggleDockModeSetting}
-													title="Cycle dock mode: Fixed / Smart / Peek"
+													className={`cc-pill-tile ${hotspotEnabled ? "active" : ""}`}
+													onClick={toggleHotspot}
+													title="Mobile hotspot"
 												>
 													<div className="cc-pill-icon-wrapper">
-														<DockIcon />
+														<HotspotIcon />
 													</div>
 													<div className="cc-pill-info">
-														<span className="cc-pill-title">Dock Mode</span>
+														<span className="cc-pill-title">Hotspot</span>
 														<span className="cc-pill-status">
-															{dockMode === "fixed"
-																? "Fixed"
-																: dockMode === "smart"
-																	? "Smart"
-																	: "Peek"}
+															{hotspotEnabled ? "On" : "Off"}
 														</span>
 													</div>
 												</div>
@@ -4076,23 +4093,18 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 													</button>
 												</div>
 
-												{/* Notch Mode Pill */}
 												<div
-													className={`cc-pill-tile ${notchMode === "fixed" ? "active" : ""}`}
-													onClick={toggleNotchModeSetting}
-													title="Cycle notch mode: Fixed / Smart / Peek"
+													className={`cc-pill-tile ${flightModeEnabled ? "active" : ""}`}
+													onClick={toggleFlightMode}
+													title="Flight mode"
 												>
 													<div className="cc-pill-icon-wrapper">
-														<NotchIcon />
+														<FlightModeIcon />
 													</div>
 													<div className="cc-pill-info">
-														<span className="cc-pill-title">Notch Mode</span>
+														<span className="cc-pill-title">Flight Mode</span>
 														<span className="cc-pill-status">
-															{notchMode === "fixed"
-																? "Fixed"
-																: notchMode === "smart"
-																	? "Smart"
-																	: "Peek"}
+															{flightModeEnabled ? "On" : "Off"}
 														</span>
 													</div>
 												</div>
@@ -4100,34 +4112,19 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 
 											{/* Circular Actions Row */}
 											<div className="cc-circular-actions-row">
-												<button
-													className="cc-circular-btn"
-													onClick={(e) => {
-														e.stopPropagation();
-														invoke("open_app", { appName: "ms-settings:notifications" }).catch(
-															console.error
-														);
-													}}
-													title="Do Not Disturb — Open Windows notification settings"
-												>
-													<MoonIcon />
-												</button>
-												<button
-													className={`cc-circular-btn ${batterySaverEnabled ? "active" : ""}`}
-													onClick={(e) => {
-														e.stopPropagation();
-														openBatterySaverSettings();
-													}}
-													title={`Energy Saver: ${batterySaverEnabled ? "On" : "Off"} — Click to open Settings`}
-												>
-													<BatterySaverIcon />
-												</button>
-												<button
-													className="cc-circular-btn"
-													onClick={(e) => {
-														e.stopPropagation();
-														openSystemTray(e);
-													}}
+											<button
+												className={`cc-circular-btn ${dndEnabled ? "active" : ""}`}
+												onClick={toggleDnd}
+												title={`Do Not Disturb: ${dndEnabled ? "On" : "Off"}`}
+											>
+												<MoonIcon />
+											</button>
+											<button
+												className="cc-circular-btn"
+												onClick={(e) => {
+													e.stopPropagation();
+													openSystemTray(e);
+												}}
 													title="System Tray"
 												>
 													<TrayIcon />
@@ -4740,7 +4737,7 @@ function MoonIcon() {
 	);
 }
 
-function DockIcon() {
+function HotspotIcon() {
 	return (
 		<svg
 			width="18"
@@ -4752,16 +4749,16 @@ function DockIcon() {
 			strokeLinecap="round"
 			strokeLinejoin="round"
 		>
-			<rect x="2" y="14" width="20" height="8" rx="2" />
-			<line x1="6" y1="18" x2="6.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-			<line x1="10" y1="18" x2="10.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-			<line x1="14" y1="18" x2="14.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-			<line x1="18" y1="18" x2="18.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
+			<circle cx="12" cy="12" r="2" />
+			<path d="M4.93 19.07a10 10 0 0 1 0-14.14" />
+			<path d="M7.76 16.24a6 6 0 0 1 0-8.49" />
+			<path d="M16.24 7.76a6 6 0 0 1 0 8.49" />
+			<path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
 		</svg>
 	);
 }
 
-function NotchIcon() {
+function FlightModeIcon() {
 	return (
 		<svg
 			width="18"
@@ -4769,12 +4766,11 @@ function NotchIcon() {
 			viewBox="0 0 24 24"
 			fill="none"
 			stroke="currentColor"
-			strokeWidth="2.5"
+			strokeWidth="2"
 			strokeLinecap="round"
 			strokeLinejoin="round"
 		>
-			<path d="M4 3h16a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-			<path d="M9 9v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V9" />
+			<path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
 		</svg>
 	);
 }
@@ -4810,25 +4806,6 @@ function ReloadIcon() {
 			strokeLinejoin="round"
 		>
 			<path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-		</svg>
-	);
-}
-
-function BatterySaverIcon() {
-	return (
-		<svg
-			width="18"
-			height="18"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2.5"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-		>
-			<rect x="2" y="7" width="16" height="10" rx="2" />
-			<path d="M22 11v2" />
-			<path d="M6 12h4l2-3v6l-2-3H6" />
 		</svg>
 	);
 }
