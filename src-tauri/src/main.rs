@@ -7,6 +7,7 @@ mod commands;
 mod diagnostics;
 mod dock_extras;
 mod jack;
+mod privacy;
 mod services;
 mod shelf;
 mod shelf_preview;
@@ -116,6 +117,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
             open_settings_window,
+            toggle_settings_window,
             open_wifi_settings,
             open_sound_settings,
             open_notification_center,
@@ -124,6 +126,7 @@ fn main() {
             set_window_height,
             resize_settings_window,
             hide_overlay,
+            set_bottom_corners_visible,
             set_splash_fullscreen,
             sync_overlay_position,
             media_play_pause,
@@ -183,6 +186,7 @@ fn main() {
             capture_window_thumbnail,
             get_wifi_status,
             set_wifi_state,
+            get_network_widget_state,
             get_bluetooth_state,
             set_bluetooth_state,
             open_bluetooth_settings,
@@ -194,6 +198,7 @@ fn main() {
             get_system_accent_color,
             get_cpu_usage,
             get_ram_usage,
+            get_media_usage,
             get_disk_space,
             get_network_speed,
             export_settings_to_file,
@@ -353,6 +358,35 @@ fn main() {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = e {
                         api.prevent_close();
                         restore_taskbar_and_exit(&overlay_handle);
+                    }
+                });
+            }
+
+            // The bottom corner masks live in their own click-through strip so
+            // they stay glued to the physical bottom edge of the screen.
+            if let Some(corners_win) = app.get_webview_window("bottom-corners") {
+                let _ = corners_win.set_ignore_cursor_events(true);
+                if let Ok(hwnd) = corners_win.hwnd() {
+                    let _ = set_click_through(hwnd, true);
+                }
+                crate::commands::position_bottom_corners(&corners_win);
+                // A window that has never been shown ignores set_position on
+                // Windows; register it with the compositor once. Only hide it
+                // again when the saved setting has the masks off: the
+                // frontend's visibility sync can already have run by now, and
+                // hiding here would undo its show() until the notch changes.
+                let _ = corners_win.show();
+                let corners_on =
+                    crate::utils::get_setting_str(app.handle(), "bloom-corners-enabled")
+                        .is_some_and(|value| value == "true");
+                if !corners_on {
+                    let _ = corners_win.hide();
+                }
+                let corners_handle = app.handle().clone();
+                corners_win.on_window_event(move |e| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = e {
+                        api.prevent_close();
+                        restore_taskbar_and_exit(&corners_handle);
                     }
                 });
             }

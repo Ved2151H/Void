@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { getVersion } from "@tauri-apps/api/app";
-import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
 import { reloadIfMirrorWasStale } from "../hooks/settingsMirror";
 import { hexToHsl } from "../theme";
@@ -145,14 +143,6 @@ export function useSettings() {
 		return val !== null ? parseInt(val) : 200;
 	});
 	const [lowBatteryThreshold, setLowBatteryThreshold] = useState(20);
-	const [updateStatus, setUpdateStatus] = useState<
-		"idle" | "checking" | "available" | "uptodate" | "error" | "downloading" | "installing"
-	>("idle");
-	const [updateVersion, setUpdateVersion] = useState("");
-	const [appVersion, setAppVersion] = useState("");
-	const [autoUpdate, setAutoUpdate] = useState(
-		() => localStorage.getItem("bloom-auto-update") === "true"
-	);
 	const [scale, setScale] = useState(() =>
 		parseFloat(localStorage.getItem("bloom-scale") || "1.0")
 	);
@@ -174,12 +164,6 @@ export function useSettings() {
 		const val = localStorage.getItem("bloom-theme-brightness");
 		return val !== null ? parseFloat(val) : 0.15;
 	});
-	const [exportStatus, setExportStatus] = useState<"idle" | "exporting" | "success" | "error">(
-		"idle"
-	);
-	const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">(
-		"idle"
-	);
 
 	// ── Load all settings from backend + localStorage ──
 	const loadAllSettings = useCallback(async () => {
@@ -218,7 +202,6 @@ export function useSettings() {
 			apply(getVal("bloom-corners-enabled"), setCornersEnabled, readBool);
 			apply(getVal("bloom-time-format-24h"), setTimeFormat24h, readBool);
 			apply(getVal("bloom-show-update-indicator"), setShowUpdateIndicator, readBool);
-			apply(getVal("bloom-auto-update"), setAutoUpdate, readBool);
 			apply(getVal("bloom-volume-edge-enabled"), setVolumeEdgeEnabled, readBool);
 			apply(getVal("bloom-brightness-edge-enabled"), setBrightnessEdgeEnabled, readBool);
 			apply(getVal("bloom-dock-enabled"), setDockEnabled, readBool);
@@ -348,12 +331,6 @@ export function useSettings() {
 		isEnabled()
 			.then(setAutostart)
 			.catch(() => {});
-
-		getVersion()
-			.then((ver) => setAppVersion(ver || "3.1.2"))
-			.catch(() => setAppVersion("3.1.2"));
-
-		checkForUpdates(false);
 	}, []);
 
 	// ── Sync settings from other windows ──
@@ -395,7 +372,6 @@ export function useSettings() {
 		"bloom-low-battery-threshold": setLowBatteryThreshold,
 		"bloom-scale": setScale,
 		"bloom-temp-unit": (v) => setTempUnitFahrenheit(v === "fahrenheit"),
-		"bloom-auto-update": setAutoUpdate,
 		"bloom-volume-overlay-enabled": setVolumeOverlayEnabled,
 		"bloom-volume-edge-enabled": setVolumeEdgeEnabled,
 		"bloom-brightness-overlay-enabled": setBrightnessOverlayEnabled,
@@ -461,59 +437,6 @@ export function useSettings() {
 
 		return () => clearTimeout(timeout);
 	}, [cityName]);
-
-	// ── Update checker ──
-	const checkForUpdates = async (manual = true) => {
-		setUpdateStatus("checking");
-		try {
-			const result = await invoke<UpdateCheckResult>("check_for_updates", { force: manual });
-			if (result.available) {
-				setUpdateStatus("available");
-				setUpdateVersion(result.version ?? "");
-			} else {
-				setUpdateStatus("uptodate");
-			}
-		} catch (e) {
-			console.error("Updater error:", e);
-			setUpdateStatus("error");
-		}
-	};
-
-	const installUpdate = async () => {
-		try {
-			setUpdateStatus("downloading");
-			await invoke("install_update");
-			setUpdateStatus("idle");
-		} catch (e) {
-			console.error(e);
-			setUpdateStatus("error");
-		}
-	};
-
-	// Reflect install progress triggered from any window (including auto-update).
-	useEffect(() => {
-		const unlisten = listen<{ status: string; progress?: number }>(
-			"auto-update-status",
-			(event) => {
-				switch (event.payload.status) {
-					case "downloading":
-						setUpdateStatus("downloading");
-						break;
-					case "installing":
-						setUpdateStatus("installing");
-						break;
-					case "done":
-						setUpdateStatus((prev) =>
-							prev === "downloading" || prev === "installing" ? "idle" : prev
-						);
-						break;
-				}
-			}
-		);
-		return () => {
-			unlisten.then((fn) => fn());
-		};
-	}, []);
 
 	// ── Autostart ──
 	const toggleAutostart = async () => {
@@ -761,12 +684,6 @@ export function useSettings() {
 		saveSetting("bloom-dock-extras-custom-folders", next);
 	};
 
-	const toggleAutoUpdate = () => {
-		const next = !autoUpdate;
-		setAutoUpdate(next);
-		saveSetting("bloom-auto-update", String(next));
-	};
-
 	// ── Value setters ──
 	const setDockModeValue = (newMode: string) => {
 		setDockMode(newMode);
@@ -913,44 +830,6 @@ export function useSettings() {
 		}
 	};
 
-	// ── Export / Import ──
-	// The backend opens the native dialog and owns the file path, so these
-	// cannot be used to read or write arbitrary files from a webview.
-	const handleExportSettings = async () => {
-		setExportStatus("exporting");
-		try {
-			const filePath = await invoke<string | null>("export_settings_to_file");
-			if (filePath) {
-				setExportStatus("success");
-				setTimeout(() => setExportStatus("idle"), 2000);
-			} else {
-				setExportStatus("idle");
-			}
-		} catch (e) {
-			console.error("Export failed:", e);
-			setExportStatus("error");
-			setTimeout(() => setExportStatus("idle"), 3000);
-		}
-	};
-
-	const handleImportSettings = async () => {
-		setImportStatus("importing");
-		try {
-			const filePath = await invoke<string | null>("import_settings_from_file");
-			if (filePath) {
-				await loadAllSettings();
-				setImportStatus("success");
-				setTimeout(() => setImportStatus("idle"), 2000);
-			} else {
-				setImportStatus("idle");
-			}
-		} catch (e) {
-			console.error("Import failed:", e);
-			setImportStatus("error");
-			setTimeout(() => setImportStatus("idle"), 3000);
-		}
-	};
-
 	return {
 		saveError,
 		saveErrorDetail,
@@ -958,8 +837,6 @@ export function useSettings() {
 		// System
 		autostart,
 		toggleAutostart,
-		autoUpdate,
-		toggleAutoUpdate,
 		lowBatteryThreshold,
 		handleThresholdChange,
 		timeFormat24h,
@@ -1075,19 +952,6 @@ export function useSettings() {
 		toggleBrightnessOverlay,
 		brightnessEdgeEnabled,
 		toggleBrightnessEdge,
-
-		// Updates
-		updateStatus,
-		updateVersion,
-		appVersion,
-		checkForUpdates,
-		installUpdate,
-
-		// Import / Export
-		exportStatus,
-		importStatus,
-		handleExportSettings,
-		handleImportSettings,
 
 		// Utilities
 		restartBloom: () => invoke("restart_bloom"),

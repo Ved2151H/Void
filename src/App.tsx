@@ -62,7 +62,10 @@ import {
 	ChevronRight,
 	Inbox,
 	Music,
-	Zap
+	Zap,
+	Wifi,
+	WifiOff,
+	EthernetPort
 } from "lucide-react";
 
 /**
@@ -425,6 +428,14 @@ interface WifiStatus {
 	ssid: string | null;
 }
 
+// What the network status widget shows: the connection Windows is actually
+// routing over, with the SSID for Wi-Fi and the interface name for LAN.
+interface NetworkWidgetState {
+	kind: "wifi" | "lan" | "none";
+	ssid: string | null;
+	name: string | null;
+}
+
 // A shelf file's preview from the backend: a picture when one can be made,
 // else the opening text of a document or text file, and whether it's a folder
 // (for the placeholder icon).
@@ -454,6 +465,10 @@ type BloomMode =
 	| "bluetooth"
 	| "devices"
 	| "device";
+
+// The Calendar & Timer panel is the reference width for the quick settings
+// panels (Wi-Fi, Bluetooth, connected devices); they must line up with it.
+const CALENDAR_PANEL_WIDTH = 480;
 
 // A device that just connected or disconnected, shown briefly in the pill.
 interface DeviceAlert {
@@ -722,9 +737,10 @@ function App() {
 	const displayVolume = isMuted ? 0 : volume;
 	// Null until the first successful fetch so the pill can't flash a wrong
 	// default on startup.
-	const [wifiStatus, setWifiStatus] = useState<WifiStatus | null>(null);
-	const wifiEnabled = wifiStatus?.enabled ?? false;
-	const wifiConnected = wifiStatus?.connected ?? false;
+const [wifiStatus, setWifiStatus] = useState<WifiStatus | null>(null);
+const wifiEnabled = wifiStatus?.enabled ?? false;
+const wifiConnected = wifiStatus?.connected ?? false;
+const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(null);
 	const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
 	// Names of connected Bluetooth devices, for the controls tile.
 	const [btConnectedNames, setBtConnectedNames] = useState<string[]>([]);
@@ -749,10 +765,12 @@ function App() {
 
 	// Update state
 	const [updateAvailable, setUpdateAvailable] = useState(false);
-	const [showUpdateIndicator, setShowUpdateIndicator] = useState(
+	const [, setShowUpdateIndicator] = useState(
 		() => localStorage.getItem("bloom-show-update-indicator") !== "false"
 	);
 	const [showUpdatePulse, setShowUpdatePulse] = useState(false);
+	// Live microphone/camera use, read from Windows' capability consent store.
+	const [mediaUsage, setMediaUsage] = useState({ microphone: false, camera: false });
 
 	useEffect(() => {
 		if (windowLabel !== "main") return;
@@ -1108,6 +1126,15 @@ function App() {
 	const [settingsCornersEnabled, setSettingsCornersEnabled] = useState(
 		() => localStorage.getItem("bloom-corners-enabled") === "true"
 	);
+
+	// The bottom corner masks live in their own strip window; mirror the top
+	// corners' visibility exactly so all four edges switch together.
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		invoke("set_bottom_corners_visible", {
+			visible: isVisible && settingsCornersEnabled
+		}).catch(() => {});
+	}, [isVisible, settingsCornersEnabled, windowLabel]);
 	const [mediaLayout, setMediaLayout] = useState<"classic" | "compact">(
 		() => (localStorage.getItem("bloom-media-layout") as "classic" | "compact") || "classic"
 	);
@@ -2441,6 +2468,17 @@ function App() {
 		}
 	}, []);
 
+	// The network widget reads the routed state, so adapter- and route-level
+	// changes both move it. Fails softly: the pill just keeps its last value.
+	const refreshNetworkWidget = useCallback(async (): Promise<boolean> => {
+		try {
+			setNetworkWidget(await invoke<NetworkWidgetState>("get_network_widget_state"));
+			return true;
+		} catch {
+			return false;
+		}
+	}, []);
+
 	// Seed the Wi-Fi pill at startup. The first call can fail while the WLAN
 	// service is still coming up, so retry instead of leaving the pill stuck on
 	// its default.
@@ -2486,18 +2524,22 @@ function App() {
 	}, [bluetoothEnabled]);
 
 	// The backend reports connection changes and finished scans as they
-	// happen, so the pill follows without waiting for the next poll.
+	// happen, so the pill follows without waiting for the next poll. The
+	// network widget shares that signal for Wi-Fi connection changes.
 	useEffect(() => {
 		let debounce: ReturnType<typeof setTimeout> | undefined;
 		const unlisten = listen("wifi-changed", () => {
 			clearTimeout(debounce);
-			debounce = setTimeout(() => void refreshWifiStatus(), 300);
+			debounce = setTimeout(() => {
+				void refreshWifiStatus();
+				void refreshNetworkWidget();
+			}, 300);
 		});
 		return () => {
 			clearTimeout(debounce);
 			unlisten.then((f) => f());
 		};
-	}, [refreshWifiStatus]);
+	}, [refreshWifiStatus, refreshNetworkWidget]);
 
 	// Load bluetooth/volume/brightness state on mount
 	useEffect(() => {
@@ -2553,11 +2595,34 @@ function App() {
 					setNetDownSpeed(down);
 				})
 				.catch(() => {});
+			// The routed network state rides the same cadence as the other
+			// widget numbers; Wi-Fi events refresh it sooner above.
+			void refreshNetworkWidget();
 		};
 		fetchMetrics();
 		const interval = setInterval(fetchMetrics, 3000);
 		return () => clearInterval(interval);
-	}, []);
+	}, [refreshNetworkWidget]);
+
+	// Poll the privacy store so the notch dot follows real microphone/camera
+	// use instead of any cached state.
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		let cancelled = false;
+		const poll = () => {
+			invoke<{ microphone: boolean; camera: boolean }>("get_media_usage")
+				.then((usage) => {
+					if (!cancelled) setMediaUsage(usage);
+				})
+				.catch(() => {});
+		};
+		poll();
+		const interval = setInterval(poll, 1000);
+		return () => {
+			cancelled = true;
+			clearInterval(interval);
+		};
+	}, [windowLabel]);
 
 	// Listen for brightness changes
 	useEffect(() => {
@@ -3011,6 +3076,36 @@ function App() {
 						</span>
 					</>
 				);
+			case "wifi": {
+				const kind = networkWidget?.kind ?? "none";
+				const ssid = networkWidget?.ssid ?? null;
+				const label =
+					kind === "wifi"
+						? (ssid ?? "No Network")
+						: kind === "lan"
+							? "LAN"
+							: "No Network";
+				const tooltip =
+					kind === "wifi"
+						? (ssid ? `Wi-Fi — ${ssid}` : "Wi-Fi")
+						: kind === "lan"
+							? (networkWidget?.name ? `LAN — ${networkWidget.name}` : "LAN")
+							: "No Network";
+				return statusWidget(
+					"wifi",
+					tooltip,
+					<>
+						{kind === "wifi" ? (
+							<Wifi size={12} strokeWidth={2} />
+						) : kind === "lan" ? (
+							<EthernetPort size={12} strokeWidth={2} />
+						) : (
+							<WifiOff size={12} strokeWidth={2} />
+						)}
+						<span className="label">{label}</span>
+					</>
+				);
+			}
 			default:
 				return null;
 		}
@@ -3038,10 +3133,10 @@ function App() {
 	const getDynamicWidth = () => {
 		if (bloomMode === "announcement" && announcement && !announcementDismissed) return 380;
 		if (bloomMode === "device" && deviceAlert) return 330;
-		if (isCalendarMode) return 480;
+		if (isCalendarMode) return CALENDAR_PANEL_WIDTH;
 		if (bloomMode === "shelf") return 380;
 		if (bloomMode === "command-center" && isOpen) return 350;
-		if (bloomMode === "wifi" || bloomMode === "bluetooth" || bloomMode === "devices") return 350;
+		if (bloomMode === "wifi" || bloomMode === "bluetooth" || bloomMode === "devices") return CALENDAR_PANEL_WIDTH;
 		if (showMusicOnStatusHover) {
 			return 170 + (settingsVisualizerEnabled ? 30 : 0);
 		}
@@ -3703,8 +3798,20 @@ function App() {
 																		</motion.button>
 																	)}
 																</AnimatePresence>
-																{updateAvailable && showUpdateIndicator && (
-																	<div className="update-dot" />
+																{(mediaUsage.microphone || mediaUsage.camera) && (
+																	<div
+																		className="privacy-dots"
+																		aria-label={
+																			mediaUsage.microphone && mediaUsage.camera
+																				? "Microphone and camera in use"
+																				: mediaUsage.microphone
+																					? "Microphone in use"
+																					: "Camera in use"
+																		}
+																	>
+																		{mediaUsage.microphone && <div className="privacy-dot" />}
+																		{mediaUsage.camera && <div className="privacy-dot" />}
+																	</div>
 																)}
 															</div>
 

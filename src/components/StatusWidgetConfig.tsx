@@ -25,6 +25,7 @@ import {
 	MemoryStick,
 	HardDrive,
 	ArrowUpDown,
+	Wifi,
 	Circle,
 	X,
 	ArrowLeftRight,
@@ -51,6 +52,7 @@ const WIDGET_DEFS: WidgetDef[] = [
 	{ id: "cpu", label: "CPU", icon: Cpu, color: "#f97316" },
 	{ id: "ram", label: "RAM", icon: MemoryStick, color: "#a78bfa" },
 	{ id: "disk", label: "Disk", icon: HardDrive, color: "#38bdf8" },
+	{ id: "wifi", label: "Wi-Fi", icon: Wifi, color: "#93c5fd" },
 	{ id: "net", label: "Net", icon: ArrowUpDown, color: "#2dd4bf" }
 ];
 

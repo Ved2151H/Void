@@ -4,15 +4,14 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Effect } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { X, Settings, Palette, PanelTop, Monitor, Layers, Info, Megaphone } from "lucide-react";
+import { X, Settings, Palette, PanelTop, Monitor, Layers, Megaphone } from "lucide-react";
 import {
 	useSettings,
 	GeneralTab,
 	AppearanceTab,
 	NotchTab,
 	DockTab,
-	OverlaysTab,
-	AboutTab
+	OverlaysTab
 } from "./settings/index";
 import type { SettingsTab } from "./settings/index";
 import { useAnnouncement } from "./hooks/useAnnouncement";
@@ -27,8 +26,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
 	{ id: "appearance", label: "Appearance", icon: Palette },
 	{ id: "notch", label: "Notch", icon: PanelTop },
 	{ id: "dock", label: "Dock", icon: Monitor },
-	{ id: "overlays", label: "Overlays", icon: Layers },
-	{ id: "about", label: "About", icon: Info }
+	{ id: "overlays", label: "Overlays", icon: Layers }
 ];
 
 const TAB_COPY: Record<SettingsTab, string> = {
@@ -36,8 +34,7 @@ const TAB_COPY: Record<SettingsTab, string> = {
 	appearance: "Make every surface feel at home on your desktop.",
 	notch: "Choose what appears at the top of your screen.",
 	dock: "Shape the taskbar replacement around your workflow.",
-	overlays: "Keep quick controls visible only when you need them.",
-	about: "Version, updates and your settings data."
+	overlays: "Keep quick controls visible only when you need them."
 };
 
 function SettingsApp() {
@@ -302,21 +299,6 @@ function SettingsApp() {
 							toggleBrightnessOverlay={settings.toggleBrightnessOverlay}
 							brightnessEdgeEnabled={settings.brightnessEdgeEnabled}
 							toggleBrightnessEdge={settings.toggleBrightnessEdge}
-						/>
-					)}
-					{activeTab === "about" && (
-						<AboutTab
-							appVersion={settings.appVersion}
-							autoUpdate={settings.autoUpdate}
-							toggleAutoUpdate={settings.toggleAutoUpdate}
-							updateStatus={settings.updateStatus}
-							updateVersion={settings.updateVersion}
-							checkForUpdates={settings.checkForUpdates}
-							installUpdate={settings.installUpdate}
-							exportStatus={settings.exportStatus}
-							importStatus={settings.importStatus}
-							handleExportSettings={settings.handleExportSettings}
-							handleImportSettings={settings.handleImportSettings}
 						/>
 					)}
 				</div>

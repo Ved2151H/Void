@@ -1,4 +1,4 @@
-:root {
+﻿:root {
 	--bg-color: var(
 		--bloom-bg,
 		rgba(18, 18, 20, 0.5)
@@ -1194,77 +1194,6 @@ input:checked + .slider:before {
 	font-weight: 800;
 	font-display: swap;
 	src: url("./assets/fonts/syne-800.woff2") format("woff2");
-}
-
-.about-tab-container {
-	display: flex;
-	flex-direction: column;
-	align-items: stretch;
-	padding: 10px 4px;
-}
-
-.about-header {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	text-align: center;
-	margin-bottom: 20px;
-	margin-top: 14px;
-}
-
-.about-logo {
-	width: 68px;
-	height: 68px;
-	margin-bottom: 14px;
-	user-drag: none;
-	-webkit-user-drag: none;
-	will-change: transform;
-	transition:
-		transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-		filter 0.2s ease;
-}
-
-.about-logo:hover {
-	transform: rotate(360deg);
-}
-
-.light-mode .about-logo {
-	filter: invert(1);
-}
-
-.about-title {
-	font-family: "Syne", "Segoe UI", system-ui, sans-serif;
-	font-size: 40px;
-	font-weight: 800;
-	line-height: 1;
-	color: var(--bloom-text, #ffffff);
-	margin: 0;
-	letter-spacing: -0.035em;
-}
-
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-	.about-title {
-		background: linear-gradient(
-			180deg,
-			var(--bloom-text, #ffffff) 45%,
-			color-mix(in srgb, var(--bloom-text, #ffffff) 55%, transparent) 100%
-		);
-		-webkit-background-clip: text;
-		background-clip: text;
-		color: transparent;
-	}
-}
-
-.about-version {
-	margin: 12px 0 0;
-	padding: 3px 9px 2px;
-	border-radius: 999px;
-	background: var(--bloom-group-bg, rgba(255, 255, 255, 0.06));
-	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.55));
-	font-size: 10px;
-	font-weight: 600;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
 }
 
 /* Light mode overrides for close button */

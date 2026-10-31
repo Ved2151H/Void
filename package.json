@@ -1,6 +1,6 @@
 {
   "name": "void",
-  "version": "3.10.1",
+  "version": "1.0.0",
   "private": true,
   "license": "GPL-3.0-only",
   "type": "module",

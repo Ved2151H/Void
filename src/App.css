@@ -464,6 +464,25 @@ img {
 	pointer-events: none;
 }
 
+/* One dot per device in use (microphone, camera), in the update dot's slot. */
+.privacy-dots {
+	position: absolute;
+	top: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-top: -4px;
+	display: flex;
+	gap: 3px;
+	pointer-events: none;
+}
+
+.privacy-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: #32d74b;
+}
+
 /* Music visualizer - horizontal bars (like iPhone Dynamic Island) */
 .music-visualizer {
 	display: flex;

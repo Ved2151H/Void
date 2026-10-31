@@ -697,6 +697,10 @@ const Dock = memo(function Dock() {
 		try {
 			if (app.path === "start") {
 				await invoke("open_app", { appName: "start" });
+			} else if (app.path === "bloom-settings") {
+				// The Settings icon is the only way in and out of that window:
+				// one click opens it, a click while it is in front hides it.
+				await invoke("toggle_settings_window");
 			} else if (app.is_background && app.tray_ids?.length === 1) {
 				await invoke("activate_tray_icon", { trayId: app.tray_ids[0] });
 			} else if (app.all_hwnds && app.all_hwnds.length > 1) {
@@ -1552,7 +1556,8 @@ const Dock = memo(function Dock() {
 															iconsRef.current[dockIconKey(app, isHost)] ||
 															iconsRef.current[cacheKey] ||
 															(allowPathFallback && iconsRef.current[app.path]) ||
-															app.icon;
+															app.icon ||
+															(app.path === "bloom-settings" ? "/bloom.png" : null);
 
 														const isBloomOrSettings =
 															app.name.toLowerCase() === "settings" ||
@@ -1712,7 +1717,8 @@ const Dock = memo(function Dock() {
 													iconsRef.current[dockIconKey(app, isHost)] ||
 													iconsRef.current[cacheKey] ||
 													(allowPathFallback && iconsRef.current[app.path]) ||
-													app.icon;
+													app.icon ||
+													(app.path === "bloom-settings" ? "/bloom.png" : null);
 											const isBloomOrSettings =
 												app.name.toLowerCase() === "settings" ||
 												app.name.toLowerCase() === "void" ||

@@ -2214,9 +2214,60 @@ pub fn open_settings_window(app: AppHandle) {
     }
 }
 
+/// Dock clicks on the Settings icon behave like a taskbar button: hide the
+/// window when it is already in front, otherwise bring the single existing
+/// Settings window forward. Never creates a second window.
+#[tauri::command]
+pub fn toggle_settings_window(app: AppHandle) {
+    let Some(win) = app.get_webview_window("settings") else {
+        return;
+    };
+    let in_front = win.is_visible().unwrap_or(false) && win.is_focused().unwrap_or(false);
+    if in_front {
+        let _ = win.hide();
+        return;
+    }
+    open_settings_window(app);
+}
+
 #[tauri::command]
 pub fn hide_overlay(app: AppHandle) {
     if let Some(win) = app.get_webview_window("overlay") {
+        let _ = win.hide();
+    }
+}
+
+/// Pins the bottom-corners strip to the bottom edge of the primary monitor.
+/// The strip is only as tall as the corner masks, so its CSS `bottom: 0`
+/// lands on the physical screen edge at any scale factor.
+pub fn position_bottom_corners(win: &tauri::WebviewWindow) {
+    if let Ok(Some(monitor)) = win.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let position = monitor.position();
+        let size = monitor.size();
+        let height = (38.0 * scale).round().max(1.0) as i32;
+        let _ = win.set_position(tauri::PhysicalPosition::new(
+            position.x,
+            position.y + size.height as i32 - height,
+        ));
+        let _ = win.set_size(tauri::PhysicalSize::new(size.width, height as u32));
+    }
+}
+
+/// Shows the bottom corner masks only while the notch is on screen and the
+/// "Screen Corners" setting is enabled.
+#[tauri::command]
+pub fn set_bottom_corners_visible(app: AppHandle, visible: bool) {
+    let Some(win) = app.get_webview_window("bottom-corners") else {
+        return;
+    };
+    if visible {
+        position_bottom_corners(&win);
+        let _ = win.show();
+        if let Ok(hwnd) = win.hwnd() {
+            crate::utils::re_assert_topmost(hwnd);
+        }
+    } else {
         let _ = win.hide();
     }
 }
@@ -3346,6 +3397,13 @@ pub async fn get_wifi_status() -> Result<WifiStatus, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// The connection the Windows host actually routes over, for the network
+/// status widget: Wi-Fi with its SSID, the LAN side, or nothing.
+#[tauri::command]
+pub async fn get_network_widget_state() -> Result<crate::wifi::NetworkWidgetState, String> {
+    crate::wifi::network_widget_state()
+}
+
 #[tauri::command]
 pub async fn set_wifi_state(enabled: bool) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -3508,6 +3566,13 @@ pub fn get_ram_usage() -> Result<f32, String> {
             .map_err(|e| format!("GlobalMemoryStatusEx failed: {e}"))?;
         Ok(mem.dwMemoryLoad as f32)
     }
+}
+
+/// Whether the microphone and/or camera is in use right now, read from the
+/// Windows capability consent store (see `privacy`).
+#[tauri::command]
+pub fn get_media_usage() -> crate::privacy::MediaUsage {
+    crate::privacy::media_usage()
 }
 
 #[tauri::command]

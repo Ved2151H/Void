@@ -22,10 +22,10 @@ use windows::Win32::NetworkManagement::WiFi::{
     WlanGetAvailableNetworkList, WlanGetProfile, WlanOpenHandle, WlanQueryInterface,
     WlanRegisterNotification, WlanScan, WlanSetProfile, DOT11_CIPHER_ALGO_TKIP, DOT11_SSID,
     L2_NOTIFICATION_DATA, WLAN_AVAILABLE_NETWORK, WLAN_AVAILABLE_NETWORK_CONNECTED,
-    WLAN_AVAILABLE_NETWORK_HAS_PROFILE, WLAN_AVAILABLE_NETWORK_LIST, WLAN_CONNECTION_ATTRIBUTES,
-    WLAN_CONNECTION_NOTIFICATION_DATA, WLAN_CONNECTION_PARAMETERS, WLAN_INTERFACE_INFO_LIST,
-    WLAN_NOTIFICATION_SOURCE_ACM, WLAN_REASON_CODE_MSMSEC_BASE,
-    WLAN_REASON_CODE_MSMSEC_PSK_MISMATCH_SUSPECTED,
+    WLAN_AVAILABLE_NETWORK_HAS_PROFILE, WLAN_AVAILABLE_NETWORK_LIST,
+    WLAN_CONNECTION_ATTRIBUTES, WLAN_CONNECTION_NOTIFICATION_DATA, WLAN_CONNECTION_PARAMETERS,
+    WLAN_INTERFACE_INFO, WLAN_INTERFACE_INFO_LIST, WLAN_NOTIFICATION_SOURCE_ACM,
+    WLAN_REASON_CODE_MSMSEC_BASE, WLAN_REASON_CODE_MSMSEC_PSK_MISMATCH_SUSPECTED,
 };
 
 /// How long to wait for Windows to report the outcome of a connection attempt.
@@ -454,6 +454,128 @@ pub fn connected_ssid() -> Option<String> {
             WlanFreeMemory(data);
         }
         ssid
+    }
+}
+
+/// Network connection state for the placed status widget: which connection
+/// Windows is actually routing over (Wi-Fi vs the LAN side), the associated
+/// SSID for Wi-Fi, and the interface name for LAN.
+#[derive(Clone, Serialize)]
+pub struct NetworkWidgetState {
+    /// "wifi", "lan" or "none".
+    pub kind: &'static str,
+    /// The connected network's name, for Wi-Fi.
+    pub ssid: Option<String>,
+    /// The active interface's friendly name, for LAN.
+    pub name: Option<String>,
+}
+
+/// The wlanapi is only alive when the Wi-Fi radio stack is; a missing adapter
+/// isn't an error for this widget, so adapters are best-effort collected.
+fn wlan_adapter_guids() -> Vec<GUID> {
+    let Ok(client) = Client::open() else {
+        return Vec::new();
+    };
+    let mut list: *mut WLAN_INTERFACE_INFO_LIST = std::ptr::null_mut();
+    let rc = unsafe { WlanEnumInterfaces(client.0, None, &mut list) };
+    if rc != 0 {
+        return Vec::new();
+    }
+    let guids = unsafe {
+        let count = list.as_ref().map_or(0u32, |l| l.dwNumberOfItems) as usize;
+        let first = std::ptr::addr_of!((*list).InterfaceInfo).cast::<WLAN_INTERFACE_INFO>();
+        let guids = std::slice::from_raw_parts(first, count)
+            .iter()
+            .map(|info| info.InterfaceGuid)
+            .collect::<Vec<_>>();
+        WlanFreeMemory(list as *const _);
+        guids
+    };
+    guids
+}
+
+/// The interface Windows would actually send internet traffic through, from
+/// the IP stack's own lowest-metric default route — not adapter presence.
+/// Returns the interface's GUID, friendly alias and description.
+fn active_default_route_interface() -> Option<(GUID, String, String)> {
+    use windows::Win32::NetworkManagement::IpHelper::{
+        FreeMibTable, GetIfEntry2, GetIpForwardTable2, MIB_IPFORWARD_TABLE2, MIB_IPFORWARD_ROW2,
+    };
+
+    // Default routes (prefix length 0) of the first family that has any,
+    // cheapest metric first. The Windows host's choices come from its v4
+    // table first; IPv6 carries it only when v4 routes are gone. The rows
+    // are copied out before the table is released.
+    let mut forward: *mut MIB_IPFORWARD_TABLE2 = std::ptr::null_mut();
+    let ret = unsafe { GetIpForwardTable2(windows::Win32::Networking::WinSock::AF_INET, &mut forward) };
+    if !ret.is_ok() || forward.is_null() {
+        return None;
+    }
+    let mut active_routes: Vec<(u32, u32)> = unsafe {
+        std::slice::from_raw_parts(
+            std::ptr::addr_of!((*forward).Table).cast::<MIB_IPFORWARD_ROW2>(),
+            (*forward).NumEntries as usize,
+        )
+        .iter()
+        // The loopback interface never owns a real default route.
+        .filter(|r| r.DestinationPrefix.PrefixLength == 0 && r.InterfaceIndex != 0)
+        .map(|r| (r.InterfaceIndex, r.Metric))
+        .collect()
+    };
+    unsafe { FreeMibTable(forward.cast()) };
+    active_routes.sort_by_key(|&(_, metric)| metric);
+    let &(interface_index, _) = active_routes.first()?;
+
+    let mut entry =
+        windows::Win32::NetworkManagement::IpHelper::MIB_IF_ROW2 {
+            InterfaceIndex: interface_index,
+            ..Default::default()
+        };
+    let ret = unsafe { GetIfEntry2(&mut entry) };
+    if !ret.is_ok() {
+        return None;
+    }
+    Some((
+        entry.InterfaceGuid,
+        wide_to_string(&entry.Alias),
+        wide_to_string(&entry.Description),
+    ))
+}
+
+/// The connection Windows is actually using: Wi-Fi (with SSID) when the
+/// default route rides a wireless adapter, LAN when it rides any other
+/// interface, and no network when no interface has a default route.
+pub fn network_widget_state() -> Result<NetworkWidgetState, String> {
+    let active = active_default_route_interface();
+    let adapter_guids = wlan_adapter_guids();
+
+    match active {
+        // The route's interface is a wireless adapter: Windows is sending
+        // traffic over Wi-Fi, so the widget shows the association's SSID.
+        Some((guid, _alias, _description)) if adapter_guids.iter().any(|w| w == &guid) => {
+            Ok(NetworkWidgetState {
+                kind: "wifi",
+                ssid: connected_ssid(),
+                name: None,
+            })
+        }
+        // Every routed-over interface that isn't the Wi-Fi adapter counts as
+        // the LAN side (ethernet, VPN, USB dongles), labelled with its name.
+        Some((_guid, _alias, description)) => Ok(NetworkWidgetState {
+            kind: "lan",
+            ssid: None,
+            name: if description.is_empty() { None } else { Some(description) },
+        }),
+        // No default route at all: an associated Wi-Fi adapter still counts
+        // as connected (association can outlive a momentarily missing route).
+        None => {
+            let ssid = connected_ssid();
+            Ok(NetworkWidgetState {
+                kind: if ssid.is_some() { "wifi" } else { "none" },
+                ssid,
+                name: None,
+            })
+        }
     }
 }
 

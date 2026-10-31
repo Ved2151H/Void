@@ -1081,13 +1081,6 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         }
                         (SystemCommand::ToggleVisibility(visible), _) => {
                             let _ = handle_system.emit("visibility-change", visible);
-                            if let Some(w) = handle_system.get_webview_window("bottom-corners") {
-                                if visible {
-                                    let _ = w.show();
-                                } else {
-                                    let _ = w.hide();
-                                }
-                            }
                         }
                     }
                 }
@@ -4268,6 +4261,12 @@ fn reposition_all_windows(app_handle: &AppHandle) {
     }
     if let Some(dock_win) = app_handle.get_webview_window("dock") {
         if let Ok(hwnd) = dock_win.hwnd() {
+            re_assert_topmost(hwnd);
+        }
+    }
+    if let Some(corners_win) = app_handle.get_webview_window("bottom-corners") {
+        crate::commands::position_bottom_corners(&corners_win);
+        if let Ok(hwnd) = corners_win.hwnd() {
             re_assert_topmost(hwnd);
         }
     }
