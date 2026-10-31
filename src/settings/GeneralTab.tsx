@@ -1,4 +1,4 @@
-import { Power, Download, Clock, BatteryWarning, RefreshCw, RotateCcw, LogOut } from "lucide-react";
+import { Power, Download, Clock, BatteryWarning, RefreshCw, RotateCcw, LogOut, Info } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
 interface GeneralTabProps {
@@ -77,6 +77,9 @@ export function GeneralTab({
 
 			<div className="setting-group-label">App</div>
 			<div className="setting-group">
+				<SettingRow icon={Info} label="Version" desc="Current app version">
+					<span className="setting-version">2.0v</span>
+				</SettingRow>
 				<SettingRow
 					icon={RotateCcw}
 					label="Reset to Defaults"

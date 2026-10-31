@@ -754,6 +754,12 @@ body {
 	opacity: 0.8;
 }
 
+.setting-version {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+
 .folder-chip {
 	display: inline-flex;
 	align-items: center;
