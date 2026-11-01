@@ -3282,7 +3282,9 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 			if (shelfItems.length === 0) return 130;
 			return shelfOverflowing ? 190 : 176;
 		}
-		if (bloomMode === "screen-time") return 420;
+		// Screen Time keeps a short Today/week row with a single Used Apps
+		// dropdown, whose list opens over the row above, so the frame stays fixed.
+		if (bloomMode === "screen-time") return 200;
 		// System uses a 2x2 grid of equal 120px cards, so its notch is sized to
 		// the grid (38px header + 18px body padding + 247px grid) instead of
 		// reserving the taller Screen Time frame.

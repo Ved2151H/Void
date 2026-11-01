@@ -158,7 +158,7 @@
 
 .st-top {
 	flex: none;
-	height: 118px;
+	height: 96px;
 	min-width: 0;
 	display: grid;
 	grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
@@ -359,11 +359,16 @@
 
 /* Apps */
 .st-apps {
+	position: relative;
+	z-index: 2;
+	overflow: visible;
 	flex: 1;
 	min-height: 0;
 	padding: 7px 12px 8px;
 	display: flex;
 	flex-direction: column;
+	justify-content: center;
+	gap: 6px;
 }
 
 .st-apps-head {
@@ -372,124 +377,142 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
-	padding: 0 2px 3px;
+	padding: 0 2px;
 }
 
-.st-apps-title {
-	font-size: 11px;
-	font-weight: 720;
-	line-height: 1.2;
-}
-
-.st-apps-mode {
+/* One dropdown lists every app with its time; the OS popup opens over the
+   panel, so the section stays short. */
+.st-app-trigger {
 	display: inline-flex;
 	align-items: center;
-	gap: 3px;
-	font-size: 7.2px;
-	font-weight: 500;
-	white-space: nowrap;
-	color: var(--sp-dim);
-}
-
-.st-app-list {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-	overflow-y: auto;
-	overscroll-behavior: contain;
-}
-
-.st-app-list::-webkit-scrollbar {
-	width: 3px;
-}
-
-.st-app-list::-webkit-scrollbar-thumb {
-	background: rgba(255, 255, 255, 0.16);
-	border-radius: 2px;
-}
-
-.st-app-row {
-	flex: 1;
-	min-height: 24px;
+	gap: 5px;
+	max-width: 64%;
 	min-width: 0;
-	display: grid;
-	grid-template-columns: 19px minmax(0, 1fr) minmax(58px, 1.25fr) 32px;
-	align-items: center;
-	gap: 6px;
-	padding: 0 2px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+	padding: 3px 8px;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.05);
+	font: inherit;
+	font-size: 7.2px;
+	line-height: 1.2;
+	color: var(--sp-dim);
+	cursor: pointer;
+	transition:
+		color 0.15s ease,
+		border-color 0.15s ease,
+		background 0.15s ease;
 }
 
-.st-app-row:last-child {
-	border-bottom: 0;
+.st-app-trigger:hover:not(:disabled),
+.st-app-trigger.open {
+	color: var(--sp-text);
+	border-color: rgba(255, 255, 255, 0.34);
+	background: rgba(255, 255, 255, 0.09);
 }
 
-.st-app-icon {
-	width: 20px;
-	height: 20px;
-	overflow: hidden;
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	border-radius: 5px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: #151817;
-	font-size: 8.5px;
-	font-weight: 800;
-	color: #d9ffe0;
+.st-app-trigger:disabled {
+	cursor: default;
+	opacity: 0.7;
 }
 
-.st-app-icon img {
-	width: 18px;
-	height: 18px;
-	object-fit: contain;
-}
-
-.st-app-name {
+.st-app-trigger-name {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 8.8px;
-	font-weight: 600;
-	line-height: 1.15;
 }
 
-.st-app-track {
-	width: 100%;
-	height: 4px;
-	overflow: hidden;
-	border-radius: 999px;
-	background: var(--sp-track);
-}
-
-.st-app-track > span {
-	display: block;
-	height: 100%;
-	border-radius: inherit;
-	background: linear-gradient(90deg, #ffffff, #e6e7e7);
-	transition: width 0.35s ease;
-}
-
-.st-app-time {
-	text-align: right;
-	font-size: 8.5px;
+.st-app-trigger-time {
+	flex: none;
 	font-weight: 650;
-	line-height: 1;
 	font-variant-numeric: tabular-nums;
 	color: var(--sp-text);
 }
 
+.st-app-caret {
+	flex: none;
+	transition: transform 0.15s ease;
+}
 
-.st-empty {
-	flex: 1;
+.st-app-trigger.open .st-app-caret {
+	transform: rotate(180deg);
+}
+
+/* The open list: one row per app, name left and time right. */
+/* Opens over the Today row instead of growing the notch: a resize would pull
+   the pointer out from under the window and collapse it mid-click. */
+.st-app-menu {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 100%;
+	z-index: 6;
+	margin-bottom: 5px;
+	padding: 4px;
+	max-height: 96px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 8px;
+	background: #141616;
+	box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
+}
+
+.st-app-menu::-webkit-scrollbar {
+	width: 3px;
+}
+
+.st-app-menu::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.16);
+	border-radius: 2px;
+}
+
+.st-app-menu-row {
+	flex: none;
+	height: 22px;
+	min-width: 0;
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	padding: 0 16px;
-	text-align: center;
-	font-size: 8.5px;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 0 4px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	font: inherit;
+	font-size: 8.2px;
+	line-height: 1;
+	color: var(--sp-dim);
+	text-align: left;
+	cursor: pointer;
+}
+
+.st-app-menu-row:hover,
+.st-app-menu-row.active {
+	background: rgba(255, 255, 255, 0.07);
+	color: var(--sp-text);
+}
+
+.st-app-menu-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.st-app-menu-time {
+	flex: none;
+	font-weight: 650;
+	font-variant-numeric: tabular-nums;
+	color: var(--sp-text);
+}
+
+.st-app-menu-empty {
+	padding: 7px 4px;
+	font-size: 7.6px;
+	line-height: 1.35;
 	color: var(--sp-muted);
 }
 
@@ -984,7 +1007,6 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.st-bar,
-	.st-app-track > span,
 	.sys-power-fill,
 	.sys-metric-track > span {
 		transition: none;

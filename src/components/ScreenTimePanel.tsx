@@ -80,9 +80,9 @@ export function ScreenTimePanel({
 	onNext
 }: ScreenTimePanelProps) {
 	const [data, setData] = useState<ScreenTimeSnapshot | null>(null);
-	const [icons, setIcons] = useState<Record<string, string | null>>({});
 	const [failed, setFailed] = useState(false);
-	const iconCache = useRef<Record<string, string | null>>({});
+	const [menuOpen, setMenuOpen] = useState(false);
+	const menuRef = useRef<HTMLDivElement>(null);
 	const mounted = useRef(true);
 	const firstLoad = useRef(true);
 
@@ -113,30 +113,6 @@ export function ScreenTimePanel({
 		};
 	}, [load]);
 
-	useEffect(() => {
-		const apps = data?.apps.slice(0, 8) ?? [];
-		const missing = apps.filter((app) => !(app.key in iconCache.current));
-		if (missing.length === 0) return;
-
-		let cancelled = false;
-		void Promise.all(
-			missing.map(async (app) => {
-				try {
-					const icon = await invoke<string | null>("get_app_icon", { path: app.path });
-					iconCache.current[app.key] = icon ?? null;
-				} catch {
-					iconCache.current[app.key] = null;
-				}
-			})
-		).then(() => {
-			if (!cancelled) setIcons({ ...iconCache.current });
-		});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [data]);
-
 	const networkKind = network?.kind ?? "none";
 	const networkName =
 		networkKind === "wifi"
@@ -152,7 +128,23 @@ export function ScreenTimePanel({
 	const maxDay = Math.max(1, ...(data?.days.map((day) => day.seconds) ?? [0]));
 	const weekTotal = data?.days.reduce((sum, day) => sum + day.seconds, 0) ?? 0;
 	const lastDayDate = data?.days.length ? data.days[data.days.length - 1].date : "";
-	const topApps = data?.apps.slice(0, 8) ?? [];
+	const apps = data?.apps ?? [];
+	// Close the list on an outside click or Escape, like any other menu.
+	useEffect(() => {
+		if (!menuOpen) return;
+		const onPointerDown = (event: PointerEvent) => {
+			if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
+		};
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setMenuOpen(false);
+		};
+		window.addEventListener("pointerdown", onPointerDown, true);
+		window.addEventListener("keydown", onKeyDown);
+		return () => {
+			window.removeEventListener("pointerdown", onPointerDown, true);
+			window.removeEventListener("keydown", onKeyDown);
+		};
+	}, [menuOpen]);
 
 	return (
 		<div className="sp-root" onClick={(event) => event.stopPropagation()}>
@@ -235,44 +227,50 @@ export function ScreenTimePanel({
 					</div>
 				</div>
 
-				<div className="sp-card st-apps">
+				<div className="sp-card st-apps" ref={menuRef}>
 					<div className="st-apps-head">
-						<span className="st-apps-title">By app</span>
-						<span className="st-apps-mode">
-							while Void runs
-							<ChevronDown size={9} strokeWidth={2.2} />
-						</span>
+						<span className="st-apps-title">Used Apps</span>
+						<button
+							type="button"
+							className={`st-app-trigger${menuOpen ? " open" : ""}`}
+							onClick={() => setMenuOpen((open) => !open)}
+							disabled={apps.length === 0}
+							aria-expanded={menuOpen}
+							aria-haspopup="listbox"
+							aria-label="Show apps used today and their time"
+						>
+							{apps.length === 0 ? "No apps" : `${apps.length} apps`}
+							<ChevronDown size={9} strokeWidth={2.2} className="st-app-caret" />
+						</button>
 					</div>
-					<div className="st-app-list">
-						{topApps.length === 0 ? (
-							<div className="st-empty">
-								{failed
-									? "Screen time is unavailable right now."
-									: firstLoad.current
-										? "Reading screen time…"
-										: "No app usage recorded yet today."}
-							</div>
-						) : (
-							topApps.map((app) => (
-								<div className="st-app-row" key={app.key}>
-									<div className="st-app-icon">
-										{icons[app.key] ? (
-											<img src={icons[app.key] as string} alt="" draggable={false} />
-										) : (
-											<span>{(app.name || "?").slice(0, 1).toUpperCase()}</span>
-										)}
-									</div>
-									<span className="st-app-name" title={app.name}>
-										{app.name}
-									</span>
-									<span className="st-app-track">
-										<span style={{ width: `${Math.max(2, app.percent)}%` }} />
-									</span>
-									<span className="st-app-time">{duration(app.seconds)}</span>
+					{menuOpen && (
+						<div className="st-app-menu" role="listbox" aria-label="Apps used today and their time">
+							{apps.length === 0 ? (
+								<div className="st-app-menu-empty">
+									{failed
+										? "Screen time is unavailable right now."
+										: firstLoad.current
+											? "Reading screen time…"
+											: "No app usage recorded yet today."}
 								</div>
-							))
-						)}
-					</div>
+							) : (
+								apps.map((app) => (
+									<button
+										type="button"
+										key={app.key}
+										role="option"
+										className="st-app-menu-row"
+										onClick={() => setMenuOpen(false)}
+									>
+										<span className="st-app-menu-name" title={app.name}>
+											{app.name}
+										</span>
+										<span className="st-app-menu-time">{duration(app.seconds)}</span>
+									</button>
+								))
+							)}
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

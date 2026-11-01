@@ -78,7 +78,7 @@ export function GeneralTab({
 			<div className="setting-group-label">App</div>
 			<div className="setting-group">
 				<SettingRow icon={Info} label="Version" desc="Current app version">
-					<span className="setting-version">3.0v</span>
+					<span className="setting-version">v4</span>
 				</SettingRow>
 				<SettingRow
 					icon={RotateCcw}
