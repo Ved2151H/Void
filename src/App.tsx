@@ -43,6 +43,8 @@ import { deviceArtFor } from "./devices/deviceArtFor";
 import { deviceLookFor } from "./devices/deviceLooks";
 import type { BudLevel, BudsBattery } from "./devices/connectedDevices";
 import { ConnectedDevicesPanel } from "./components/ConnectedDevicesPanel";
+import { ScreenTimePanel } from "./components/ScreenTimePanel";
+import { SystemPanel } from "./components/SystemPanel";
 import { useConnectedDevices } from "./hooks/useConnectedDevices";
 import { isWiredAudio, usbArtFor, usbDisplayName, type UsbIdentity } from "./devices/usbArtFor";
 import type { DeviceArtKey } from "./devices/art";
@@ -75,11 +77,17 @@ import {
  * - Live activities (music, a set timer, a filled shelf) show a compact form in
  *   the pill or a bubble beside it, and opening one shows its own view, which
  *   stands alone (no panel arrows) and is never remembered as the last panel.
- *   Dragging files onto the notch also opens the shelf. Wheel/swipe switches
- *   between tool panels, including when a live activity occupies the pill.
+ *   Dragging files onto the notch also opens the shelf. Once a panel is open,
+ *   wheel/swipe moves through the panel ring without leaving it.
  */
-type NotchPanel = "calendar" | "command-center" | "devices";
-const NOTCH_PANELS: readonly NotchPanel[] = ["calendar", "command-center", "devices"];
+type NotchPanel = "calendar" | "command-center" | "devices" | "screen-time" | "system";
+const NOTCH_PANELS: readonly NotchPanel[] = [
+	"calendar",
+	"command-center",
+	"devices",
+	"screen-time",
+	"system"
+];
 const asNotchPanel = (value: unknown): NotchPanel | null =>
 	NOTCH_PANELS.includes(value as NotchPanel) ? (value as NotchPanel) : null;
 
@@ -464,6 +472,8 @@ type BloomMode =
 	| "wifi"
 	| "bluetooth"
 	| "devices"
+	| "screen-time"
+	| "system"
 	| "device";
 
 // The Calendar & Timer panel is the reference width for the quick settings
@@ -754,6 +764,11 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 	const [cpuUsage, setCpuUsage] = useState(0);
 	const [ramUsage, setRamUsage] = useState(0);
 	const [diskSpace, setDiskSpace] = useState(0);
+	const [diskUsage, setDiskUsage] = useState<{
+		free_gb: number;
+		total_gb: number;
+		used_percent: number;
+	} | null>(null);
 	const [netUpSpeed, setNetUpSpeed] = useState(0);
 	const [netDownSpeed, setNetDownSpeed] = useState(0);
 	const [statusWidgets, setStatusWidgets] = useState<WidgetConfig>({
@@ -1687,7 +1702,9 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 			prev === "shelf" ||
 			prev === "wifi" ||
 			prev === "bluetooth" ||
-			prev === "devices"
+			prev === "devices" ||
+			prev === "screen-time" ||
+			prev === "system"
 				? restingModeRef.current
 				: prev
 		);
@@ -1917,31 +1934,12 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 
 	// Window height is now kept constant to prevent rendering layout lag and sharp corners
 
-	const lastScrollTime = useRef(0);
-	const handleWheel = (e: React.WheelEvent) => {
-		const target = e.target as HTMLElement;
-		if (
-			target.closest(".calendar-grid") ||
-			target.closest(".timer-column") ||
-			target.closest(".shelf-content") ||
-			target.closest(".qp-list")
-		) {
-			return;
-		}
-
-		const now = Date.now();
-		if (now - lastScrollTime.current < 250) return;
-
-		// Use absolute values to detect horizontal swipe gestures on trackpad
-		const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-		if (Math.abs(delta) < 5) return; // Ignore tiny movements
-
-		if (cycleBloomMode(delta > 0 ? 1 : -1)) lastScrollTime.current = now;
-	};
-
 	function panelEnabled(panel: NotchPanel) {
 		if (panel === "calendar") return settingsCalendarEnabled;
 		if (panel === "command-center") return settingsControlsPanelEnabled;
+		// The two system sections are always part of the panel ring; the
+		// existing Connected devices panel keeps its opt-in setting.
+		if (panel === "screen-time" || panel === "system") return true;
 		return settingsDevicesPanelEnabled;
 	}
 
@@ -1952,20 +1950,6 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		return panelEnabled(panel);
 	}
 
-	// Wheel and swipe navigate panels, even from a collapsed live activity.
-	// Music and shelf remain entry points through their activity affordances.
-	const cycleBloomMode = (direction: 1 | -1) => {
-		if (bloomMode === "announcement") return false;
-		const panels = NOTCH_PANELS.filter(panelAvailable);
-		const currentIndex = panels.indexOf(bloomMode as NotchPanel);
-		const nextMode = currentIndex === -1
-			? openingPanel()
-			: panels[(currentIndex + direction + panels.length) % panels.length];
-		setIsOpen(true);
-		setBloomMode(nextMode);
-		return true;
-	};
-
 	// Arrows and wheel both stay within panels once one is open.
 	const cyclePanel = (direction: 1 | -1) => {
 		const panels = NOTCH_PANELS.filter(panelAvailable);
@@ -1973,6 +1957,89 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		if (index === -1 || panels.length < 2) return;
 		setBloomMode(panels[(index + direction + panels.length) % panels.length]);
 	};
+
+	// The native wheel listener lives outside React's delegated events so it
+	// can cancel page scrolling, and it reads the latest cycle function without
+	// being torn down and rebuilt on every section change (which would lose the
+	// gesture lock mid-burst).
+	const cyclePanelRef = useRef(cyclePanel);
+	cyclePanelRef.current = cyclePanel;
+
+	useEffect(() => {
+		if (windowLabel !== "main") return;
+		const notch = bloomRef.current;
+		if (!notch) return;
+
+		// A wheel stream is one gesture: navigate on its first significant
+		// movement, then ignore the rest of the stream until the wheel is quiet.
+		// This keeps one fast flick or a burst of wheel ticks to one section.
+		const WHEEL_THRESHOLD = 8;
+		const WHEEL_SETTLE_MS = 160;
+		let gestureActive = false;
+		let settleTimer: number | undefined;
+
+		const endWheelGesture = () => {
+			settleTimer = undefined;
+			gestureActive = false;
+		};
+
+		// Section content can scroll on its own (the app list in Screen Time,
+		// device lists, the shelf strip). Those regions keep native scrolling;
+		// only the rest of the notch is a section-switching surface. The class
+		// check also covers a scroll region whose content currently fits, so
+		// the same spot never flips between scrolling and navigation.
+		const SCROLL_REGION_SELECTOR =
+			".st-app-list, .qp-list, .shelf-content, .cmp-output-list";
+		const isScrollableContent = (target: EventTarget | null) => {
+			if (target instanceof Element && target.closest(SCROLL_REGION_SELECTOR)) return true;
+			let node = target instanceof Element ? target : null;
+			while (node && node !== notch) {
+				if (node instanceof HTMLElement) {
+					const style = getComputedStyle(node);
+					const scrollsY =
+						/(auto|scroll|overlay)/.test(style.overflowY) &&
+						node.scrollHeight > node.clientHeight + 1;
+					const scrollsX =
+						/(auto|scroll|overlay)/.test(style.overflowX) &&
+						node.scrollWidth > node.clientWidth + 1;
+					if (scrollsY || scrollsX) return true;
+				}
+				node = node.parentElement;
+			}
+			return false;
+		};
+
+		const handleWheel = (event: WheelEvent) => {
+			if (!(event.target instanceof Node) || !notch.contains(event.target)) return;
+			if (isScrollableContent(event.target)) return;
+			// Wheel navigation belongs to an open section; clicking the notch
+			// first is what expands it.
+			if (!isOpenRef.current) return;
+
+			// Mice report lines or pages, trackpads pixels.
+			const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? notch.clientHeight : 1;
+			const deltaY = event.deltaY * unit;
+			const deltaX = event.deltaX * unit;
+			const delta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+
+			// Any event over the notch belongs to this stream, even one too
+			// small to navigate, and must not leak through to the page.
+			event.preventDefault();
+			if (settleTimer !== undefined) window.clearTimeout(settleTimer);
+			settleTimer = window.setTimeout(endWheelGesture, WHEEL_SETTLE_MS);
+
+			if (gestureActive || Math.abs(delta) < WHEEL_THRESHOLD) return;
+			gestureActive = true;
+			event.stopPropagation();
+			cyclePanelRef.current(delta > 0 ? 1 : -1);
+		};
+
+		notch.addEventListener("wheel", handleWheel, { passive: false });
+		return () => {
+			notch.removeEventListener("wheel", handleWheel);
+			if (settleTimer !== undefined) window.clearTimeout(settleTimer);
+		};
+	}, [windowLabel]);
 
 	// Timer state
 	const [timerSeconds, setTimerSeconds] = useState(0);
@@ -2601,8 +2668,15 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 			invoke<number>("get_ram_usage")
 				.then(setRamUsage)
 				.catch((e) => console.warn("RAM:", e));
-			invoke<number>("get_disk_space")
-				.then(setDiskSpace)
+			invoke<{
+				free_gb: number;
+				total_gb: number;
+				used_percent: number;
+			}>("get_disk_space")
+				.then((usage) => {
+					setDiskUsage(usage);
+					setDiskSpace(Math.floor(usage.free_gb));
+				})
 				.catch((e) => console.warn("Disk:", e));
 			invoke<[number, number]>("get_network_speed")
 				.then(([up, down]) => {
@@ -2760,6 +2834,14 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		},
 		[sendVolume]
 	);
+
+	const toggleMute = useCallback(() => {
+		if (isMuted || volume === 0) {
+			handleVolumeChange(volume > 0 ? volume : 0.5);
+		} else {
+			handleVolumeChange(0);
+		}
+	}, [handleVolumeChange, isMuted, volume]);
 
 	// WiFi toggle
 	const toggleWifi = useCallback(async () => {
@@ -3157,6 +3239,9 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		if (bloomMode === "device" && deviceAlert) return 330;
 		if (isCalendarMode) return CALENDAR_PANEL_WIDTH;
 		if (bloomMode === "shelf") return 380;
+		// Both new sections use the same panel width as Calendar, Command
+		// Center and Connected devices.
+		if (bloomMode === "screen-time" || bloomMode === "system") return CALENDAR_PANEL_WIDTH;
 		if (bloomMode === "command-center" && isOpen) return CALENDAR_PANEL_WIDTH;
 		if (bloomMode === "wifi" || bloomMode === "bluetooth" || bloomMode === "devices") return CALENDAR_PANEL_WIDTH;
 		if (showMusicOnStatusHover) {
@@ -3197,6 +3282,11 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 			if (shelfItems.length === 0) return 130;
 			return shelfOverflowing ? 190 : 176;
 		}
+		if (bloomMode === "screen-time") return 420;
+		// System uses a 2x2 grid of equal 120px cards, so its notch is sized to
+		// the grid (38px header + 18px body padding + 247px grid) instead of
+		// reserving the taller Screen Time frame.
+		if (bloomMode === "system") return 303;
 		if (bloomMode === "command-center") return isOpen ? 230 : 36;
 		if (bloomMode === "devices") {
 			return devicesPanelHeight;
@@ -3215,8 +3305,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 	};
 
 	const isCalendarMode = bloomMode === "calendar";
-	// Arrows switch between the two tool panels; wheel/swipe can also open one
-	// directly from the collapsed pill or a live activity.
+	// Arrows and wheel/swipe switch between the open tool panels.
 	const showPanelArrows =
 		isOpen && asNotchPanel(bloomMode) !== null && NOTCH_PANELS.filter(panelAvailable).length > 1;
 
@@ -3293,7 +3382,6 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 					className={`bloom ${isHovered ? "expanded" : ""} ${isImpacted ? "is-impacted" : ""} ${isDragHovering ? "drag-hover" : ""}`}
 					onMouseEnter={() => setIsNotchHovered(true)}
 					onMouseLeave={() => setIsNotchHovered(false)}
-					onWheel={handleWheel}
 					initial={{
 						y: 250,
 						width: 30.6,
@@ -3661,7 +3749,14 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 											<div
 												className="main-row"
 												// A device alert covers the whole pill.
-												style={bloomMode === "device" || deviceAlertOnScreen ? { visibility: "hidden" } : undefined}
+												style={
+													bloomMode === "device" ||
+													deviceAlertOnScreen ||
+													bloomMode === "screen-time" ||
+													bloomMode === "system"
+														? { visibility: "hidden" }
+														: undefined
+												}
 											>
 												<AnimatePresence mode="wait">
 													{(showPowerPulse || showLowBatteryPulse || showUpdatePulse) &&
@@ -4217,6 +4312,63 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 													<span className="cc-classic-percentage">{currentBrightness}%</span>
 												</div>
 											</div>
+										</motion.div>
+									)}
+								</AnimatePresence>
+
+								{/* Screen Time: real foreground-app usage kept by the backend. */}
+								<AnimatePresence>
+									{bloomMode === "screen-time" && (
+										<motion.div
+											key="screen-time-view"
+											initial={{ opacity: 0 }}
+											animate={{ opacity: 1 }}
+											exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 400, damping: 30 }}
+										>
+											<ScreenTimePanel
+												batteryLevel={batteryLevel}
+												isCharging={isCharging}
+												network={networkWidget}
+												onPrev={() => cyclePanel(-1)}
+												onNext={() => cyclePanel(1)}
+												onOpenSettings={() => void openSettingsWindow()}
+												onClose={releaseNotchHover}
+											/>
+										</motion.div>
+									)}
+								</AnimatePresence>
+
+								{/* System: battery, network, performance and audio. */}
+								<AnimatePresence>
+									{bloomMode === "system" && (
+										<motion.div
+											key="system-view"
+											initial={{ opacity: 0 }}
+											animate={{ opacity: 1 }}
+											exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+											transition={{ type: "spring", stiffness: 400, damping: 30 }}
+										>
+											<SystemPanel
+												batteryLevel={batteryLevel}
+												isCharging={isCharging}
+												battery={batteryDetails}
+												cpuUsage={cpuUsage}
+												ramUsage={ramUsage}
+												diskUsage={diskUsage}
+												netUpSpeed={netUpSpeed}
+												netDownSpeed={netDownSpeed}
+												network={networkWidget}
+												volume={volume}
+												isMuted={isMuted}
+												onVolumeChange={handleVolumeChange}
+												onToggleMute={toggleMute}
+												onRefreshBattery={refreshBatteryDetails}
+												onPrev={() => cyclePanel(-1)}
+												onNext={() => cyclePanel(1)}
+												onOpenSettings={() => void openSettingsWindow()}
+												onClose={releaseNotchHover}
+											/>
 										</motion.div>
 									)}
 								</AnimatePresence>

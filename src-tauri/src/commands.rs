@@ -3834,8 +3834,17 @@ pub fn get_media_usage() -> crate::privacy::MediaUsage {
     crate::privacy::media_usage()
 }
 
+/// Free and total space on the system drive, plus the used share, for the
+/// status widget and the System panel's disk meter.
+#[derive(serde::Serialize)]
+pub struct DiskUsage {
+    pub free_gb: f64,
+    pub total_gb: f64,
+    pub used_percent: f32,
+}
+
 #[tauri::command]
-pub fn get_disk_space() -> Result<u64, String> {
+pub fn get_disk_space() -> Result<DiskUsage, String> {
     unsafe {
         let mut free_bytes = 0u64;
         let mut total_bytes = 0u64;
@@ -3847,8 +3856,60 @@ pub fn get_disk_space() -> Result<u64, String> {
             Some(&mut total_free),
         )
         .map_err(|e| format!("GetDiskFreeSpaceEx failed: {e}"))?;
-        Ok(free_bytes / (1024 * 1024 * 1024))
+        let gb = 1024.0 * 1024.0 * 1024.0;
+        Ok(DiskUsage {
+            free_gb: free_bytes as f64 / gb,
+            total_gb: total_bytes as f64 / gb,
+            used_percent: if total_bytes > 0 {
+                ((total_bytes.saturating_sub(free_bytes)) as f64 / total_bytes as f64 * 100.0)
+                    as f32
+            } else {
+                0.0
+            },
+        })
     }
+}
+
+/// Friendly name of the default audio output, for the System panel's volume
+/// card. `None` means the machine has no active render endpoint.
+#[tauri::command]
+pub async fn get_audio_output() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| unsafe {
+        use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+        use windows::Win32::Media::Audio::{eConsole, eRender, IMMDeviceEnumerator};
+        use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_ALL,
+            COINIT_MULTITHREADED, STGM_READ,
+        };
+
+        let initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+        let result = (|| -> Result<Option<String>, String> {
+            let enumerator: IMMDeviceEnumerator = CoCreateInstance(
+                &windows::Win32::Media::Audio::MMDeviceEnumerator,
+                None,
+                CLSCTX_ALL,
+            )
+            .map_err(|e| e.to_string())?;
+            let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) else {
+                return Ok(None);
+            };
+            let store = device.OpenPropertyStore(STGM_READ).map_err(|e| e.to_string())?;
+            let value = store
+                .GetValue(&PKEY_Device_FriendlyName)
+                .map_err(|e| e.to_string())?;
+            let text = PropVariantToStringAlloc(&value).map_err(|e| e.to_string())?;
+            let name = text.to_string().ok();
+            CoTaskMemFree(Some(text.0 as *const _));
+            Ok(name.filter(|name| !name.trim().is_empty()))
+        })();
+        if initialized {
+            CoUninitialize();
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

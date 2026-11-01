@@ -8,6 +8,7 @@ mod diagnostics;
 mod dock_extras;
 mod jack;
 mod privacy;
+mod screen_time;
 mod services;
 mod shelf;
 mod shelf_preview;
@@ -205,6 +206,8 @@ fn main() {
             get_ram_usage,
             get_media_usage,
             get_disk_space,
+            get_audio_output,
+            screen_time::get_screen_time,
             get_network_speed,
             export_settings_to_file,
             import_settings_from_file,
@@ -234,6 +237,7 @@ fn main() {
         ])
         .setup(|app| {
             init_taskbar_marker(app.handle());
+            screen_time::init(app.handle());
             // Populate the settings cache before anything else: a webview can
             // invoke save_setting as soon as it loads, which happens before the
             // rest of this hook runs.
