@@ -21,6 +21,20 @@ export interface TrayApp {
 	window_handles: number[];
 }
 
+const START_ICON_SOURCES: Record<string, string> = {
+	"bloom-colorful": "/bloom-colorful.png",
+	"bloom-golden": "/bloom-golden.png",
+	"bloom-biscuit": "/bloom-biscuit.png",
+	windows: "/windows-11.png"
+};
+
+/** The configured start-button icon: a public asset, or a user icon's data URI. */
+export function resolveStartIcon(startIcon: string): string {
+	return startIcon.startsWith("custom:")
+		? startIcon.slice("custom:".length)
+		: (START_ICON_SOURCES[startIcon] ?? "/bloom.png");
+}
+
 export function dockIconKey(
 	app: Pick<AppInfo, "path" | "name" | "hwnd" | "icon_name" | "icon_path">,
 	isHost: boolean

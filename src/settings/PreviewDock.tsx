@@ -3,31 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { motion } from "framer-motion";
 import { Folder, HardDrive, Trash2 } from "lucide-react";
 import { EdgeSurface } from "../components/EdgeSurface";
-import type { AppInfo } from "../dockApps";
+import { TaskViewIcon } from "../icons";
+import { resolveStartIcon, type AppInfo } from "../dockApps";
 import { parseCustomFolders, parseEnabledFolders } from "../dockExtras";
 import type { useSettings } from "./useSettings";
 
 type Settings = ReturnType<typeof useSettings>;
-
-function startIconSource(icon: string) {
-	const icons: Record<string, string> = {
-		default: "/bloom.png",
-		windows: "/windows-11.png",
-		"bloom-colorful": "/bloom-colorful.png",
-		"bloom-golden": "/bloom-golden.png",
-		"bloom-biscuit": "/bloom-biscuit.png"
-	};
-	return icon.startsWith("custom:") ? icon.slice(7) : (icons[icon] ?? "/bloom.png");
-}
-
-function TaskViewIcon() {
-	return (
-		<svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round">
-			<rect x="3.5" y="7.5" width="13" height="13" rx="3" />
-			<path d="M8 3.5h9.5a3 3 0 0 1 3 3V16" />
-		</svg>
-	);
-}
 
 export function PreviewDock({ settings, revealed }: { settings: Settings; revealed: boolean }) {
 	const [apps, setApps] = useState<AppInfo[]>([]);
@@ -132,7 +113,7 @@ export function PreviewDock({ settings, revealed }: { settings: Settings; reveal
 				<div className="dock-reorder-container">
 					{item(
 						"Start",
-						<img src={startIconSource(settings.startIcon)} alt="" className="bloom-icon-img" />,
+						<img src={resolveStartIcon(settings.startIcon)} alt="" className="bloom-icon-img" />,
 						false,
 						"start"
 					)}

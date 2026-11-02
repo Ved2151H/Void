@@ -4,8 +4,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./Dock.css";
 import { EdgeSurface } from "./components/EdgeSurface";
+import { TaskViewIcon } from "./icons";
 import { initTheme } from "./theme";
 import { useSettingsSync } from "./hooks/useSettingsSync";
+import { useInteractionState } from "./hooks/useInteractionState";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
 import { dockOverlapSpan } from "./dockGeometry";
 
@@ -13,6 +15,7 @@ import {
 	dockIconKey,
 	matchesPackagedExecutable,
 	mergeTrayApps,
+	resolveStartIcon,
 	selectDockTrayApps,
 	type AppInfo,
 	type TrayApp
@@ -24,13 +27,13 @@ import { createRegionSender, measureElements, padRect, type RegionRect } from ".
 // window, so their window title must be part of their identity — otherwise two
 // PWAs running under the same browser collapse into a single dock item.
 const HOST_PROCESSES = ["msedge.exe", "chrome.exe", "brave.exe", "applicationframehost.exe"];
-export function isBrowserHost(path: string) {
+function isBrowserHost(path: string) {
 	const p = path.toLowerCase();
 	return HOST_PROCESSES.some((host) => p.includes(host));
 }
 
 // Stable identity for a dock item.
-export function appIdentity(p: string, executable?: string, name?: string) {
+function appIdentity(p: string, executable?: string, name?: string) {
 	if (!p) return "";
 	const normalized = p.toLowerCase().replace(/\\/g, "/");
 	// Shell application ids (AUMIDs) and bare names are unique on their own.
@@ -70,7 +73,7 @@ function sameRunningApps(left: AppInfo[], right: AppInfo[]): boolean {
 // Fuzzy identity: a running window and its installed/pinned entry often carry
 // different paths (exe vs .lnk vs AUMID), so exact keys miss and the same app
 // looks pinnable twice. Mirrors the dock list's own pinned↔running matching.
-export function isSameApp(a: AppInfo, b: AppInfo): boolean {
+function isSameApp(a: AppInfo, b: AppInfo): boolean {
 	if (!a.path || !b.path) return false;
 	if (itemKey(a) === itemKey(b)) return true;
 	if (matchesPackagedExecutable(a, b)) return true;
@@ -112,27 +115,6 @@ const fileOf = (p: string) =>
 // Shell application ids (AUMIDs) identify one specific app; two different PWAs
 // running in the same browser must never be matched by their shared exe name.
 const isIdentifier = (p: string) => !p.includes("/") && !p.includes("\\");
-
-// Resolve the configured start-button icon to a public asset, or to the data
-// URI of a user-uploaded icon (stored with a "custom:" prefix).
-// Task View's glyph: a window in front of another, as on the taskbar.
-function TaskViewIcon() {
-	return (
-		<svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round">
-			<rect x="3.5" y="7.5" width="13" height="13" rx="3" />
-			<path d="M8 3.5h9.5a3 3 0 0 1 3 3V16" />
-		</svg>
-	);
-}
-
-function resolveStartIcon(startIcon: string): string {
-	if (startIcon === "bloom-colorful") return "/bloom-colorful.png";
-	if (startIcon === "bloom-golden") return "/bloom-golden.png";
-	if (startIcon === "bloom-biscuit") return "/bloom-biscuit.png";
-	if (startIcon === "windows") return "/windows-11.png";
-	if (startIcon.startsWith("custom:")) return startIcon.slice("custom:".length);
-	return "/bloom.png";
-}
 
 // Stable module-level constants so object references never change between renders,
 // preventing Framer Motion from re-triggering animations on every re-render.
@@ -256,22 +238,12 @@ const Dock = memo(function Dock() {
 	}, [showAddPopup, scale]);
 
 	const isCurrentlyHovered = isDockHovered || isEdgeHovered;
-	const [interactionState, setInteractionState] = useState<"active" | "grace" | "none">("none");
 	const isAnyInteraction = isCurrentlyHovered || !!contextMenu || showAddPopup || nativeMenuOpen;
+	const interactionState = useInteractionState(isAnyInteraction);
 
 	const previewTimerRef = useRef<any>(null);
 	const isPreviewHoveredRef = useRef(false);
 	const hoveredAppRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		if (isAnyInteraction) {
-			setInteractionState("active");
-		} else if (interactionState !== "none") {
-			setInteractionState("grace");
-			const timer = setTimeout(() => setInteractionState("none"), 800);
-			return () => clearTimeout(timer);
-		}
-	}, [isAnyInteraction]);
 
 	const isHidden =
 		!startupAnimating &&

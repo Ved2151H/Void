@@ -33,18 +33,6 @@
 
 @keyframes da-glow { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0.85; } }
 
-.device-art .lid-out { transform-origin: 50% var(--seam); }
-
-.device-art .lid-in { transform-origin: 50% var(--seam); transform: scaleY(0); }
-
-.device-art.play .lid-out { animation: da-fold 0.22s 0.3s ease-in both; }
-
-.device-art.play .lid-in { animation: da-unfold 0.34s 0.52s var(--ease) both; }
-
-@keyframes da-fold { to { transform: scaleY(0); } }
-
-@keyframes da-unfold { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-
 .device-art .buds { transform: translateY(3px); }
 
 .device-art.play .buds { animation: da-settle 0.5s 0.62s var(--ease) both; }
@@ -88,8 +76,6 @@
 .device-art.play .key { animation: da-key 0.5s var(--d) ease-out both; }
 
 @keyframes da-key { 0% { fill: var(--shade); } 40% { fill: var(--accent); } 100% { fill: var(--shade); } }
-
-.device-art .port-clip { clip-path: inset(0 0 14% 0); }
 
 .device-art.play .insert { animation: da-insert 0.5s var(--ease) both; }
 
@@ -139,12 +125,6 @@
 .device-art.play .led { animation: da-led 0.3s var(--d) ease-out both; }
 
 @keyframes da-led { to { fill: var(--accent); opacity: 1; } }
-
-.device-art .pump { transform-box: fill-box; transform-origin: center; }
-
-.device-art.play .pump { animation: da-pump 0.9s var(--d) ease-in-out both; }
-
-@keyframes da-pump { 15%, 55% { transform: scaleX(1.25); } 35%, 75% { transform: scaleX(0.9); } 100% { transform: none; } }
 
 .device-art .grille { transform-box: fill-box; transform-origin: center; }
 

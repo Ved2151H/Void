@@ -28,6 +28,7 @@ import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
+import { useInteractionState } from "./hooks/useInteractionState";
 import { useAnnouncement } from "./hooks/useAnnouncement";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -36,6 +37,7 @@ import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import { EdgeSurface } from "./components/EdgeSurface";
 import { ShelfTypeIcon } from "./components/ShelfTypeIcon";
+import { TitleMarquee } from "./components/TitleMarquee";
 import { WifiPanel } from "./components/WifiPanel";
 import { BluetoothPanel } from "./components/BluetoothPanel";
 import { DeviceArt, DeviceArtDefs } from "./devices/DeviceArt";
@@ -588,58 +590,6 @@ function DeviceBudsBattery({ buds }: { buds: BudsBattery }) {
 // The shelf is a short-lived stash: one row, newest first, oldest evicted.
 const SHELF_MAX_ITEMS = 10;
 
-const MARQUEE_SPEED = 30; // px/s — constant for all titles
-const MARQUEE_MIN_DURATION = 5; // floor so short titles don't flicker
-
-const TitleMarquee = ({ title }: { title: string }) => {
-	const textRef = useRef<HTMLSpanElement>(null);
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [isOverflowing, setIsOverflowing] = useState(false);
-	const [scrollDistance, setScrollDistance] = useState(0);
-	const [scrollDuration, setScrollDuration] = useState(8);
-
-	useEffect(() => {
-		const check = () => {
-			if (textRef.current && containerRef.current) {
-				const textWidth = textRef.current.scrollWidth;
-				const containerWidth = containerRef.current.clientWidth;
-				const overflow = textWidth > containerWidth;
-				setIsOverflowing(overflow);
-				if (overflow) {
-					const distance = textWidth - containerWidth;
-					setScrollDistance(distance);
-					setScrollDuration(Math.max(distance / MARQUEE_SPEED, MARQUEE_MIN_DURATION));
-				}
-			}
-		};
-		check();
-		const observer = new ResizeObserver(check);
-		if (containerRef.current) observer.observe(containerRef.current);
-		return () => observer.disconnect();
-	}, [title]);
-
-	return (
-		<div
-			ref={containerRef}
-			className="premium-title-wrap"
-			style={{ width: "100%", overflow: "hidden" }}
-		>
-			<span
-				ref={textRef}
-				className={`premium-title ${isOverflowing ? "marquee" : ""}`}
-				style={
-					{
-						"--scroll-distance": isOverflowing ? `-${scrollDistance}px` : undefined,
-						"--scroll-duration": `${scrollDuration}s`
-					} as React.CSSProperties
-				}
-			>
-				{title}
-			</span>
-		</div>
-	);
-};
-
 function App() {
 	useEffect(() => {
 		return initTheme();
@@ -876,7 +826,6 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 
 	const [isEdgeHovered, setIsEdgeHovered] = useState(false);
 	const [isOverlapped, setIsOverlapped] = useState(false);
-	const [interactionState, setInteractionState] = useState<"active" | "grace" | "none">("none");
 	const bloomRef = useRef<HTMLDivElement>(null);
 	// Measured to fit the hovered status strip; see statusFitWidth.
 	const leftWidgetsRef = useRef<HTMLDivElement>(null);
@@ -923,21 +872,12 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 	const appliedNotchMode = useRef<string | null>(null);
 
 	const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
+	const interactionState = useInteractionState(isAnyInteraction);
 	const isHidden =
 		!startupAnimating &&
 		!deviceAlertOnScreen &&
 		((notchMode === "smart" && isOverlapped && interactionState === "none") ||
 			(notchMode === "peek" && interactionState === "none" && !eventPeek));
-
-	useEffect(() => {
-		if (isAnyInteraction) {
-			setInteractionState("active");
-		} else if (interactionState !== "none") {
-			setInteractionState("grace");
-			const timer = setTimeout(() => setInteractionState("none"), 800);
-			return () => clearTimeout(timer);
-		}
-	}, [isAnyInteraction]);
 
 	useEffect(() => {
 		if (windowLabel === "main") {
@@ -1988,8 +1928,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		// only the rest of the notch is a section-switching surface. The class
 		// check also covers a scroll region whose content currently fits, so
 		// the same spot never flips between scrolling and navigation.
-		const SCROLL_REGION_SELECTOR =
-			".st-app-list, .qp-list, .shelf-content, .cmp-output-list";
+		const SCROLL_REGION_SELECTOR = ".st-app-list, .qp-list, .shelf-content";
 		const isScrollableContent = (target: EventTarget | null) => {
 			if (target instanceof Element && target.closest(SCROLL_REGION_SELECTOR)) return true;
 			let node = target instanceof Element ? target : null;
@@ -3573,7 +3512,13 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 													<div className="metadata-controls-section-middle">
 														<div className="track-header-row">
 															<div className="track-info-middle">
-																<TitleMarquee title={mediaInfo.title} />
+																<TitleMarquee
+																	title={mediaInfo.title}
+																	wrapClassName="premium-title-wrap"
+																	textClassName="premium-title"
+																	overflowClassName="marquee"
+																	wrapStyle={{ width: "100%", overflow: "hidden" }}
+																/>
 																<span className="premium-artist">{mediaInfo.artist}</span>
 															</div>
 															<div className="header-visualizer-wrap">

@@ -10,6 +10,7 @@ import {
 	VolumeHighIcon,
 	VolumeLowIcon
 } from "../icons";
+import { TitleMarquee } from "../components/TitleMarquee";
 
 const TRACKS = [
 	{ title: "Sample track", artist: "Void preview" },
@@ -111,9 +112,12 @@ export function PreviewMediaPlayer({
 							{art}
 						</button>
 						<div className="cmp-track">
-							<div className="cmp-marquee-wrap">
-								<span className="cmp-title">{TRACKS[track].title}</span>
-							</div>
+							<TitleMarquee
+								title={TRACKS[track].title}
+								wrapClassName="cmp-marquee-wrap"
+								textClassName="cmp-title"
+								overflowClassName="cmp-marquee"
+							/>
 							<span className="cmp-artist">{TRACKS[track].artist}</span>
 						</div>
 						<div
@@ -184,9 +188,13 @@ export function PreviewMediaPlayer({
 					<div className="metadata-controls-section-middle">
 						<div className="track-header-row">
 							<div className="track-info-middle">
-								<div className="premium-title-wrap">
-									<span className="premium-title">{TRACKS[track].title}</span>
-								</div>
+								<TitleMarquee
+									title={TRACKS[track].title}
+									wrapClassName="premium-title-wrap"
+									textClassName="premium-title"
+									overflowClassName="marquee"
+									wrapStyle={{ width: "100%", overflow: "hidden" }}
+								/>
 								<span className="premium-artist">{TRACKS[track].artist}</span>
 							</div>
 							<div className={`settings-preview-visualizer${playing ? " playing" : ""}`}>

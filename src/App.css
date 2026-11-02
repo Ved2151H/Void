@@ -104,76 +104,6 @@ img {
 	color: white;
 }
 
-.bottom-row {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 100%;
-	height: 28px;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
-	flex-shrink: 0;
-	overflow: hidden;
-	padding: 0 12px;
-	box-sizing: border-box;
-	border-radius: 0 0 18px 18px;
-}
-
-.media-details {
-	container-type: inline-size;
-	width: 100%;
-	overflow: hidden;
-	position: relative;
-	display: block;
-	/* So block-level child behaves completely normally */
-}
-
-.marquee-content {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 6px;
-	font-size: 11px;
-	color: rgba(255, 255, 255, 0.9);
-	font-weight: 500;
-	white-space: nowrap;
-	width: max-content;
-	min-width: 100%;
-}
-
-.marquee-content.should-animate {
-	/* Use a nice easing for the hold at ends */
-	animation: marquee-scroll 8s cubic-bezier(0.4, 0, 0.6, 1) infinite alternate;
-}
-
-@keyframes marquee-scroll {
-	0%,
-	15% {
-		transform: translateX(0);
-	}
-
-	85%,
-	100% {
-		transform: translateX(min(0px, calc(100cqw - 100%)));
-	}
-}
-
-.marquee-content .dot {
-	opacity: 0.4;
-	font-size: 8px;
-	flex-shrink: 0;
-}
-
-.marquee-content .title,
-.marquee-content .artist {
-	display: inline-block;
-	/* remove truncation so it can expand fully and scroll */
-	white-space: nowrap;
-}
-
-.marquee-content .artist {
-	opacity: 0.6;
-}
-
 .time-center {
 	position: relative;
 }
@@ -484,13 +414,6 @@ img {
 }
 
 /* Music visualizer - horizontal bars (like iPhone Dynamic Island) */
-.music-visualizer {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	position: relative;
-}
-
 .visualizer-horizontal {
 	display: flex;
 	align-items: center;
@@ -636,54 +559,6 @@ img {
 
 .clickable:hover {
 	opacity: 0.7;
-}
-
-/* Volume Blob Styles */
-.volume-blob-container {
-	filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.5));
-}
-
-.volume-blob-wrapper {
-	position: relative;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.volume-blob {
-	filter: blur(0.5px);
-}
-
-.volume-blob-glow {
-	filter: blur(8px);
-}
-
-.volume-blob-body {
-	filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.6));
-}
-
-/* Floating particles */
-.volume-particles {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	pointer-events: none;
-}
-
-.volume-particle {
-	position: absolute;
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: radial-gradient(
-		circle,
-		rgba(255, 255, 255, 0.8) 0%,
-		rgba(168, 85, 247, 0.4) 70%,
-		transparent 100%
-	);
-	filter: blur(1px);
 }
 
 .screen-corner {
@@ -1071,11 +946,6 @@ img {
 	opacity: 1;
 }
 
-.bloom.calendar-mode {
-	padding-top: 4px;
-	border-radius: 0 0 28px 28px !important;
-}
-
 /* Compact Premium Expanded Music */
 .expanded-music-container {
 	width: 100%;
@@ -1223,10 +1093,6 @@ img {
 	object-fit: cover;
 }
 
-.layout-spacer-right {
-	display: none;
-}
-
 .controls-row-sleek {
 	display: flex;
 	align-items: center;
@@ -1347,21 +1213,6 @@ img {
 
 .classic-audio-output-btn:hover {
 	opacity: 1 !important;
-}
-
-.glow-cursor {
-	pointer-events: none;
-	position: absolute;
-	width: 16px;
-	height: 16px;
-	border-radius: 50%;
-	background: radial-gradient(
-		circle,
-		rgba(255, 255, 255, 0.8) 0%,
-		rgba(168, 85, 247, 0.4) 70%,
-		transparent 100%
-	);
-	filter: blur(1px);
 }
 
 /* Ambient Glow Behind Notch content */
@@ -2131,25 +1982,8 @@ img {
 	color: var(--bloom-text);
 }
 
-.light-mode .bottom-row {
-	border-top: 1px solid var(--bloom-border);
-}
-
-.light-mode .marquee-content {
-	color: var(--bloom-text);
-}
-
-.light-mode .music-controls svg,
-.light-mode .notch-status-icons svg,
-.light-mode .weather-notch svg {
-	stroke: var(--bloom-text);
-	color: var(--bloom-text);
-}
-
-.light-mode .volume-slider-bar,
-.light-mode .brightness-slider-bar,
-.light-mode .cc-classic-slider,
-.light-mode .slider-track-premium {
+.cc-classic-slider,
+.slider-track-premium {
 	background: rgba(0, 0, 0, 0.12);
 }
 
@@ -2463,43 +2297,3 @@ img {
 	height: 0;
 }
 
-.cmp-output-list {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	padding: 4px 0;
-	max-height: 120px;
-	overflow-y: auto;
-}
-
-.cmp-output-item {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 6px 10px;
-	border-radius: 6px;
-	cursor: pointer;
-	transition: background 0.15s ease;
-	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.6));
-	font-size: 12px;
-}
-
-.cmp-output-item:hover {
-	background: rgba(255, 255, 255, 0.08);
-}
-
-.cmp-output-item.active {
-	color: var(--bloom-text, white);
-}
-
-.cmp-output-name {
-	flex: 1;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.cmp-output-check {
-	font-size: 11px;
-	opacity: 0.6;
-}

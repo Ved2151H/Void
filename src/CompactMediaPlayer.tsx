@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { Visualizer } from "./App";
+import { TitleMarquee } from "./components/TitleMarquee";
 import {
 	PlayIcon,
 	PauseIcon,
@@ -43,54 +44,6 @@ interface CompactMediaPlayerProps {
 	onAnimatePrev: () => void;
 	onAnimateNext: () => void;
 	onLayoutChange: (layout: "classic" | "compact") => void;
-}
-
-const MARQUEE_SPEED = 30;
-const MARQUEE_MIN_DURATION = 5;
-
-function TitleMarquee({ title }: { title: string }) {
-	const textRef = useRef<HTMLSpanElement>(null);
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [isOverflowing, setIsOverflowing] = useState(false);
-	const [scrollDistance, setScrollDistance] = useState(0);
-	const [scrollDuration, setScrollDuration] = useState(8);
-
-	useEffect(() => {
-		const check = () => {
-			if (textRef.current && containerRef.current) {
-				const textWidth = textRef.current.scrollWidth;
-				const containerWidth = containerRef.current.clientWidth;
-				const overflow = textWidth > containerWidth;
-				setIsOverflowing(overflow);
-				if (overflow) {
-					const distance = textWidth - containerWidth;
-					setScrollDistance(distance);
-					setScrollDuration(Math.max(distance / MARQUEE_SPEED, MARQUEE_MIN_DURATION));
-				}
-			}
-		};
-		check();
-		const observer = new ResizeObserver(check);
-		if (containerRef.current) observer.observe(containerRef.current);
-		return () => observer.disconnect();
-	}, [title]);
-
-	return (
-		<div ref={containerRef} className="cmp-marquee-wrap">
-			<span
-				ref={textRef}
-				className={`cmp-title ${isOverflowing ? "cmp-marquee" : ""}`}
-				style={
-					{
-						"--scroll-distance": isOverflowing ? `-${scrollDistance}px` : undefined,
-						"--scroll-duration": `${scrollDuration}s`
-					} as React.CSSProperties
-				}
-			>
-				{title}
-			</span>
-		</div>
-	);
 }
 
 function formatTime(ms: number): string {
@@ -225,7 +178,12 @@ export function CompactMediaPlayer({
 					</AnimatePresence>
 				</div>
 				<div className="cmp-track">
-					<TitleMarquee title={mediaInfo.title} />
+					<TitleMarquee
+						title={mediaInfo.title}
+						wrapClassName="cmp-marquee-wrap"
+						textClassName="cmp-title"
+						overflowClassName="cmp-marquee"
+					/>
 					<span className="cmp-artist">{mediaInfo.artist}</span>
 				</div>
 				<div className="cmp-visualizer">
