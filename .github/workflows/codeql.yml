@@ -25,6 +25,9 @@ jobs:
       security-events: write
       packages: read
       contents: read
+      # analyze fetches its own workflow run for the status report; without this
+      # it logs "Resource not accessible by integration".
+      actions: read
     strategy:
       fail-fast: false
       matrix:
