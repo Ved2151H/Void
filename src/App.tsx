@@ -45,7 +45,7 @@ import { deviceArtFor } from "./devices/deviceArtFor";
 import { deviceLookFor } from "./devices/deviceLooks";
 import type { BudLevel, BudsBattery } from "./devices/connectedDevices";
 import { ConnectedDevicesPanel } from "./components/ConnectedDevicesPanel";
-import { ScreenTimePanel } from "./components/ScreenTimePanel";
+import { SCREEN_TIME_PANEL_HEIGHT, ScreenTimePanel } from "./components/ScreenTimePanel";
 import { SystemPanel } from "./components/SystemPanel";
 import { useConnectedDevices } from "./hooks/useConnectedDevices";
 import { isWiredAudio, usbArtFor, usbDisplayName, type UsbIdentity } from "./devices/usbArtFor";
@@ -721,6 +721,8 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 	} | null>(null);
 	const [netUpSpeed, setNetUpSpeed] = useState(0);
 	const [netDownSpeed, setNetDownSpeed] = useState(0);
+	// Screen Time's app list grows the notch; 0 whenever it is collapsed.
+	const [screenTimeExtraHeight, setScreenTimeExtraHeight] = useState(0);
 	const [statusWidgets, setStatusWidgets] = useState<WidgetConfig>({
 		left: ["weather"],
 		right: ["battery"]
@@ -1376,6 +1378,12 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 
 	// Bloom mode state: 'music', 'calendar', 'command-center', 'announcement', 'shelf', or 'status'
 	const [bloomMode, setBloomMode] = useState<BloomMode>("status");
+
+	// The Screen Time app list only exists inside its panel; drop its extra
+	// height as soon as another section is shown.
+	useEffect(() => {
+		if (bloomMode !== "screen-time") setScreenTimeExtraHeight(0);
+	}, [bloomMode]);
 
 	// Shelf: files and selected text stashed in the notch via drag-and-drop.
 	// Files are stored as plain paths (references, never copies). Session-scoped
@@ -3221,9 +3229,9 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 			if (shelfItems.length === 0) return 130;
 			return shelfOverflowing ? 190 : 176;
 		}
-		// Screen Time keeps a short Today/week row with a single Used Apps
-		// dropdown, whose list opens over the row above, so the frame stays fixed.
-		if (bloomMode === "screen-time") return 200;
+		// Screen Time: the collapsed dashboard plus whatever the Used Apps list
+		// needs, so the list pushes the notch down instead of overlaying it.
+		if (bloomMode === "screen-time") return SCREEN_TIME_PANEL_HEIGHT + screenTimeExtraHeight;
 		// System uses a 2x2 grid of equal 120px cards, so its notch is sized to
 		// the grid (38px header + 18px body padding + 247px grid) instead of
 		// reserving the taller Screen Time frame.
@@ -4281,6 +4289,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 												onNext={() => cyclePanel(1)}
 												onOpenSettings={() => void openSettingsWindow()}
 												onClose={releaseNotchHover}
+												onHeightChange={setScreenTimeExtraHeight}
 											/>
 										</motion.div>
 									)}

@@ -208,6 +208,7 @@ fn main() {
             get_disk_space,
             get_audio_output,
             screen_time::get_screen_time,
+            screen_time::set_screen_time_limit,
             get_network_speed,
             export_settings_to_file,
             import_settings_from_file,

@@ -4,8 +4,9 @@
 //! its own ledger: while it runs, a small worker samples the foreground window
 //! (and the last input time) and adds the elapsed seconds to that app's total
 //! for the local day. Totals are persisted next to settings.json and survive
-//! restarts. The ledger only covers time while Void is running; this is
-//! reported in the panel rather than filled with made-up history.
+//! restarts. The ledger keeps a rolling month of history and the user's daily
+//! limit lives in the same file. It only covers time while Void is running;
+//! this is reported in the panel rather than filled with made-up history.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -20,9 +21,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId,
 };
 
-/// The panel's daily limit. Eight hours matches the standard screen-time
-/// guidance shown by most wellbeing tools.
-const DAILY_LIMIT_SECONDS: u64 = 8 * 60 * 60;
+/// Default daily limit. Eight hours matches the standard screen-time guidance
+/// shown by most wellbeing tools; the user can change it in the panel.
+const DEFAULT_LIMIT_SECONDS: u64 = 8 * 60 * 60;
+/// History kept on disk. Comfortably past the 30 days the panel can browse.
+const RETENTION_DAYS: u16 = 35;
+/// Bounds for the user-set limit: a quarter of an hour up to a full day.
+const MIN_LIMIT_SECONDS: u64 = 15 * 60;
+const MAX_LIMIT_SECONDS: u64 = 24 * 60 * 60;
 /// How often the foreground app is sampled. Every sample is real elapsed time,
 /// so a long session still adds up to the wall clock.
 const SAMPLE_INTERVAL: Duration = Duration::from_secs(5);
@@ -42,9 +48,26 @@ struct DayUsage {
     apps: BTreeMap<String, AppUsage>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 struct Ledger {
     days: BTreeMap<String, DayUsage>,
+    /// The user's daily limit in seconds. Absent in files written by older
+    /// versions, which used the eight-hour default.
+    #[serde(default = "default_limit")]
+    limit_seconds: u64,
+}
+
+impl Default for Ledger {
+    fn default() -> Self {
+        Self {
+            days: BTreeMap::new(),
+            limit_seconds: DEFAULT_LIMIT_SECONDS,
+        }
+    }
+}
+
+fn default_limit() -> u64 {
+    DEFAULT_LIMIT_SECONDS
 }
 
 #[derive(Clone, Serialize)]
@@ -56,22 +79,23 @@ pub struct ScreenTimeApp {
     /// Executable path; the frontend asks `get_app_icon` for the real icon.
     pub path: String,
     pub seconds: u64,
-    pub percent: u32,
 }
 
 #[derive(Clone, Serialize)]
 pub struct ScreenTimeDay {
     pub date: String,
     pub seconds: u64,
+    /// Highest usage first, so the panel can list a day without sorting.
+    pub apps: Vec<ScreenTimeApp>,
 }
 
 #[derive(Clone, Serialize)]
 pub struct ScreenTimeSnapshot {
+    /// Today's local date key, so the panel and the ledger agree on "today".
+    pub today: String,
     pub today_seconds: u64,
     pub limit_seconds: u64,
-    pub apps_used: u32,
-    pub apps: Vec<ScreenTimeApp>,
-    /// Oldest first, ending today, always seven entries.
+    /// Oldest first, ending today. Every retained day is included.
     pub days: Vec<ScreenTimeDay>,
 }
 
@@ -113,15 +137,18 @@ fn date_key((year, month, day): (u16, u16, u16)) -> String {
     format!("{year:04}-{month:02}-{day:02}")
 }
 
-fn week_ending(year: u16, month: u16, day: u16) -> Vec<String> {
-    let mut keys = Vec::with_capacity(7);
+/// The date `days` days before `(year, month, day)`, wrapping months and years.
+fn days_before((year, month, day): (u16, u16, u16), days: u16) -> (u16, u16, u16) {
     let mut date = (year, month, day);
-    for _ in 0..7 {
-        keys.push(date_key(date));
+    for _ in 0..days {
         date = previous_day(date.0, date.1, date.2);
     }
-    keys.reverse();
-    keys
+    date
+}
+
+/// Oldest date the ledger keeps: the current day plus the rest of the window.
+fn retention_start() -> String {
+    date_key(days_before(local_date(), RETENTION_DAYS - 1))
 }
 
 fn window_title(hwnd: windows::Win32::Foundation::HWND) -> String {
@@ -192,10 +219,10 @@ fn add_sample(ledger: &mut Ledger, key: String, name: String, seconds: f64) {
 }
 
 fn prune(ledger: &mut Ledger) {
-    let today = local_date();
-    let keep = week_ending(today.0, today.1, today.2);
-    let oldest = keep.first().cloned().unwrap_or_default();
-    ledger.days.retain(|date, _| date.as_str() >= oldest.as_str());
+    let oldest = retention_start();
+    ledger
+        .days
+        .retain(|date, _| date.as_str() >= oldest.as_str());
 }
 
 fn load(path: &PathBuf) -> Ledger {
@@ -263,78 +290,83 @@ pub fn init(app: &tauri::AppHandle) {
     std::thread::spawn(track_loop);
 }
 
-/// Today's totals, the top apps and the last seven days, all from the ledger.
+/// Today's totals plus the whole retained history, all from the ledger.
 #[tauri::command]
 pub fn get_screen_time() -> ScreenTimeSnapshot {
     snapshot()
 }
 
-fn snapshot() -> ScreenTimeSnapshot {
-    let today = local_date();
-    let today_key = date_key(today);
-    let weeks = week_ending(today.0, today.1, today.2);
-
-    let (today_seconds, apps_used, apps, days) = {
-        let Ok(guard) = LEDGER.lock() else {
-            return ScreenTimeSnapshot {
-                today_seconds: 0,
-                limit_seconds: DAILY_LIMIT_SECONDS,
-                apps_used: 0,
-                apps: Vec::new(),
-                days: weeks
-                    .iter()
-                    .map(|date| ScreenTimeDay {
-                        date: date.clone(),
-                        seconds: 0,
-                    })
-                    .collect(),
-            };
-        };
-        let ledger = guard.as_ref();
-        let empty = DayUsage::default();
-        let day = ledger
-            .and_then(|ledger| ledger.days.get(&today_key))
-            .unwrap_or(&empty);
-        let today_seconds: u64 = day.apps.values().map(|app| app.seconds).sum();
-        let apps_used = day.apps.values().filter(|app| app.seconds > 0).count() as u32;
-
-        let mut apps: Vec<ScreenTimeApp> = day
-            .apps
-            .iter()
-            .filter(|(_, app)| app.seconds > 0)
-            .map(|(path, app)| ScreenTimeApp {
-                name: app.name.clone(),
-                key: path.clone(),
-                path: path.split('|').next().unwrap_or(path).to_string(),
-                seconds: app.seconds,
-                percent: if today_seconds > 0 {
-                    ((app.seconds as f64 / today_seconds as f64) * 100.0).round() as u32
-                } else {
-                    0
-                },
-            })
-            .collect();
-        apps.sort_by(|a, b| b.seconds.cmp(&a.seconds).then(a.name.cmp(&b.name)));
-
-        let days = weeks
-            .iter()
-            .map(|date| ScreenTimeDay {
-                date: date.clone(),
-                seconds: ledger
-                    .and_then(|ledger| ledger.days.get(date))
-                    .map(|day| day.apps.values().map(|app| app.seconds).sum())
-                    .unwrap_or(0),
-            })
-            .collect();
-
-        (today_seconds, apps_used, apps, days)
+/// Persists the user's daily limit. Returns the value actually stored.
+#[tauri::command]
+pub fn set_screen_time_limit(seconds: u64) -> u64 {
+    let seconds = seconds.clamp(MIN_LIMIT_SECONDS, MAX_LIMIT_SECONDS);
+    let Some(path) = LEDGER_PATH.get() else {
+        return seconds;
     };
+    if let Ok(mut guard) = LEDGER.lock() {
+        let ledger = guard.get_or_insert_with(Ledger::default);
+        ledger.limit_seconds = seconds;
+        save(path, ledger);
+    }
+    seconds
+}
+
+/// Builds one ledger day into the serialisable form the panel consumes.
+fn day_snapshot(date: String, day: &DayUsage) -> ScreenTimeDay {
+    let total: u64 = day.apps.values().map(|app| app.seconds).sum();
+    let mut apps: Vec<ScreenTimeApp> = day
+        .apps
+        .iter()
+        .filter(|(_, app)| app.seconds > 0)
+        .map(|(key, app)| ScreenTimeApp {
+            name: app.name.clone(),
+            key: key.clone(),
+            path: key.split('|').next().unwrap_or(key).to_string(),
+            seconds: app.seconds,
+        })
+        .collect();
+    apps.sort_by(|a, b| b.seconds.cmp(&a.seconds).then(a.name.cmp(&b.name)));
+    ScreenTimeDay {
+        date,
+        seconds: total,
+        apps,
+    }
+}
+
+fn snapshot() -> ScreenTimeSnapshot {
+    let today = date_key(local_date());
+    let guard = match LEDGER.lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            return ScreenTimeSnapshot {
+                today,
+                today_seconds: 0,
+                limit_seconds: DEFAULT_LIMIT_SECONDS,
+                days: Vec::new(),
+            };
+        }
+    };
+    let default_ledger = Ledger::default();
+    let ledger = guard.as_ref().unwrap_or(&default_ledger);
+
+    // BTreeMap iterates in date order, so this is already oldest first.
+    let days: Vec<ScreenTimeDay> = ledger
+        .days
+        .iter()
+        .filter(|(date, _)| date.as_str() <= today.as_str())
+        .map(|(date, day)| day_snapshot(date.clone(), day))
+        .collect();
+    let today_seconds = days
+        .iter()
+        .rev()
+        .find(|day| day.date == today)
+        .map(|day| day.seconds)
+        .unwrap_or(0);
 
     ScreenTimeSnapshot {
+        today,
         today_seconds,
-        limit_seconds: DAILY_LIMIT_SECONDS,
-        apps_used,
-        apps,
+        limit_seconds: ledger.limit_seconds,
         days,
     }
 }
@@ -353,15 +385,89 @@ mod tests {
     }
 
     #[test]
-    fn seven_day_window_ends_today() {
-        let days = week_ending(2026, 11, 1);
-        assert_eq!(days.len(), 7);
-        assert_eq!(days.first().unwrap(), "2026-10-26");
-        assert_eq!(days.last().unwrap(), "2026-11-01");
+    fn days_before_spans_a_month() {
+        assert_eq!(days_before((2026, 11, 4), 34), (2026, 10, 1));
+        assert_eq!(days_before((2026, 3, 1), 1), (2026, 2, 28));
+        assert_eq!(days_before((2026, 1, 1), 1), (2025, 12, 31));
+    }
+
+    #[test]
+    fn prune_keeps_the_retention_window_only() {
+        let mut ledger = Ledger::default();
+        for date in ["2026-09-30", "2026-10-01", "2026-10-02"] {
+            ledger.days.insert(date.to_string(), DayUsage::default());
+        }
+        // The real today is unknown in a unit test, so check the boundary rule
+        // directly: everything from retention_start() onward survives.
+        let start = retention_start();
+        ledger.days.insert(start.clone(), DayUsage::default());
+        prune(&mut ledger);
+        assert!(ledger.days.contains_key(&start));
+        assert_eq!(
+            ledger
+                .days
+                .iter()
+                .filter(|(d, _)| d.as_str() < start.as_str())
+                .count(),
+            0
+        );
     }
 
     #[test]
     fn date_key_is_zero_padded() {
         assert_eq!(date_key((2026, 1, 9)), "2026-01-09");
+    }
+
+    #[test]
+    fn ledger_written_by_an_older_version_keeps_its_history() {
+        // Files from the seven-day build have no `limit_seconds` key.
+        let text = r#"{"days":{"2026-11-03":{"apps":{"c:\\games\\a.exe":{"name":"Game","seconds":42}}}}}"#;
+        let ledger: Ledger = serde_json::from_str(text).unwrap();
+        assert_eq!(ledger.limit_seconds, DEFAULT_LIMIT_SECONDS);
+        assert_eq!(ledger.days["2026-11-03"].apps["c:\\games\\a.exe"].seconds, 42);
+    }
+
+    #[test]
+    fn limit_survives_a_save_and_load_round_trip() {
+        let mut ledger = Ledger::default();
+        ledger.limit_seconds = 5 * 3600 + 30 * 60;
+        let text = serde_json::to_string(&ledger).unwrap();
+        let reloaded: Ledger = serde_json::from_str(&text).unwrap();
+        assert_eq!(reloaded.limit_seconds, 5 * 3600 + 30 * 60);
+    }
+
+    #[test]
+    fn a_day_totals_its_apps_and_lists_the_heaviest_first() {
+        let mut day = DayUsage::default();
+        day.apps.insert(
+            "b.exe".into(),
+            AppUsage {
+                name: "B".into(),
+                seconds: 600,
+            },
+        );
+        day.apps.insert(
+            "a.exe".into(),
+            AppUsage {
+                name: "A".into(),
+                seconds: 1800,
+            },
+        );
+        day.apps.insert(
+            "idle.exe".into(),
+            AppUsage {
+                name: "Idle".into(),
+                seconds: 0,
+            },
+        );
+        let snapshot = day_snapshot("2026-11-04".into(), &day);
+        assert_eq!(snapshot.seconds, 2400);
+        assert_eq!(snapshot.apps.len(), 2);
+        assert_eq!(snapshot.apps[0].name, "A");
+        assert_eq!(snapshot.apps[1].name, "B");
+        assert_eq!(
+            snapshot.apps.iter().map(|app| app.seconds).sum::<u64>(),
+            snapshot.seconds
+        );
     }
 }
