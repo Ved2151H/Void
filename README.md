@@ -30,11 +30,3 @@ bun run build:setup   # build the installer (lands in this folder)
 ## How it works
 
 A Rust backend on Tauri v2 speaks directly to the Windows shell: AppBar registration, global keyboard hooks, WASAPI audio capture, Windows Media Session COM and WMI hardware monitoring. Four webview windows handle the notch, dock, overlays and settings.
-
-## Contributing
-
-Found a bug or want a feature? Open an [issue](https://github.com/Ved2151H/Void/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) first.
-
-## License
-
-Licensed under [GPL-3.0](LICENSE).
