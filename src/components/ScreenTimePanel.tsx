@@ -8,6 +8,8 @@ import {
 	ChevronRight,
 	Clock3,
 	Hourglass,
+	Minus,
+	Plus,
 	TrendingUp,
 	X
 } from "lucide-react";
@@ -368,6 +370,17 @@ export function ScreenTimePanel({
 		setLimitOpen(true);
 	};
 
+	const adjustLimit = async (deltaSeconds: number) => {
+		const next = Math.max(15 * 60, Math.min(24 * 60 * 60, limit + deltaSeconds));
+		if (next === limit) return;
+		try {
+			const saved = await invoke<number>("set_screen_time_limit", { seconds: next });
+			setLimitOverride(saved);
+		} catch (error) {
+			console.error("Failed to adjust the daily limit:", error);
+		}
+	};
+
 	const saveLimit = async () => {
 		const hour = parseInt(draftHour, 10) || 0;
 		const minute = parseInt(draftMinute, 10) || 0;
@@ -438,17 +451,39 @@ export function ScreenTimePanel({
 							</strong>
 						</div>
 
-						<button
-							type="button"
-							className="st-stat st-stat-button"
-							onClick={openLimitEditor}
-							title="Change the daily limit"
-							aria-label={`Daily limit ${duration(limit)}. Change it`}
-						>
-							<Clock3 size={12} strokeWidth={2} />
-							<span className="st-stat-label">Daily limit</span>
-							<strong className="st-stat-value">{duration(limit)}</strong>
-						</button>
+						<div className="st-stat st-stat-limit">
+							<button
+								type="button"
+								className="st-stat st-stat-button st-stat-limit-main"
+								onClick={openLimitEditor}
+								title="Change the daily limit"
+								aria-label={`Daily limit ${duration(limit)}. Change it`}
+							>
+								<Clock3 size={12} strokeWidth={2} />
+								<span className="st-stat-label">Daily limit</span>
+								<strong className="st-stat-value">{duration(limit)}</strong>
+							</button>
+							<div className="st-limit-steps">
+								<button
+									type="button"
+									className="st-limit-step"
+									onClick={() => void adjustLimit(-30 * 60)}
+									aria-label="Decrease daily limit"
+									title="Decrease by 30 minutes"
+								>
+									<Minus size={10} strokeWidth={2.4} />
+								</button>
+								<button
+									type="button"
+									className="st-limit-step"
+									onClick={() => void adjustLimit(30 * 60)}
+									aria-label="Increase daily limit"
+									title="Increase by 30 minutes"
+								>
+									<Plus size={10} strokeWidth={2.4} />
+								</button>
+							</div>
+						</div>
 					</div>
 
 					<div className="sp-card st-week">

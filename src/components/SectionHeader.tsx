@@ -65,11 +65,11 @@ export function SectionHeader({
 			</div>
 
 			<div className="sp-battery-wrap">
-				<span className="sp-battery-level" style={{ color: batteryColor(batteryLevel, isCharging) }}>
-					{batteryLevel}%
-				</span>
 				<span className="sp-battery">
 					<BatteryIcon level={batteryLevel} charging={isCharging} />
+				</span>
+				<span className="sp-battery-level" style={{ color: batteryColor(batteryLevel, isCharging) }}>
+					{batteryLevel}%
 				</span>
 			</div>
 		</header>

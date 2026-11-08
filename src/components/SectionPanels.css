@@ -276,9 +276,34 @@
 	outline-offset: 1px;
 }
 
-.st-stat svg {
-	flex: none;
-	opacity: 0.8;
+.st-limit-steps {
+	display: flex;
+	gap: 4px;
+	justify-content: center;
+}
+
+.st-limit-step {
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 5px;
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--sp-text);
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.st-limit-step:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.st-limit-step:focus-visible {
+	outline: 1px solid rgba(255, 255, 255, 0.4);
+	outline-offset: 1px;
 }
 
 .st-stat-label {
