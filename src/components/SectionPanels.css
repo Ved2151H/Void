@@ -1320,21 +1320,7 @@
 	outline-offset: 2px;
 }
 
-.sys-media-play {
-	background: var(--sp-green);
-	color: #133012;
-}
-
-.sys-media-play:hover:not(:disabled) {
-	background: var(--sp-green);
-	filter: brightness(1.1);
-}
-
-.sys-media-play:active:not(:disabled) {
-	transform: scale(0.92);
-}
-
-@media (prefers-reduced-motion: reduce) {
+@Media (prefers-reduced-motion: reduce) {
 	.st-bar,
 	.sys-power-fill,
 	.sys-metric-track > span,

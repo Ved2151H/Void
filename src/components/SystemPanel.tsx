@@ -356,7 +356,7 @@ export function SystemPanel({
 								</button>
 								<button
 									type="button"
-									className="sys-media-btn sys-media-play"
+									className="sys-media-btn"
 									onClick={onTogglePlayPause}
 									disabled={!media.active}
 									aria-label={media.playing ? "Pause" : "Play"}
