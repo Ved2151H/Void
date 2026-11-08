@@ -10,3 +10,4 @@ export { HeadphonesIcon } from "./HeadphonesIcon";
 export { MixerIcon } from "./MixerIcon";
 export { GithubIcon } from "./GithubIcon";
 export { TaskViewIcon } from "./TaskViewIcon";
+export { BatteryIcon } from "./BatteryIcon";

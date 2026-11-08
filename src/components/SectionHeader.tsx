@@ -1,42 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, EthernetPort, Wifi, WifiOff } from "lucide-react";
+import { BatteryIcon } from "../icons";
 import "./SectionPanels.css";
-
-/** Battery glyph in the header, using the reference's green fill. */
-function HeaderBattery({ level, charging }: { level: number; charging: boolean }) {
-	const percentage = Math.min(Math.max(level, 0), 100);
-	const low = percentage <= 20 && !charging;
-	return (
-		<svg className="sp-battery" width="24" height="11" viewBox="0 0 24 11" aria-hidden="true">
-			<rect
-				x="1"
-				y="1"
-				width="18"
-				height="9"
-				rx="2.6"
-				fill="none"
-				stroke="currentColor"
-				strokeOpacity="0.55"
-				strokeWidth="1.2"
-			/>
-			<path
-				d="M21.4 3.7V7.3"
-				stroke="currentColor"
-				strokeOpacity="0.55"
-				strokeWidth="1.4"
-				strokeLinecap="round"
-			/>
-			<rect
-				x="2.7"
-				y="2.7"
-				width={Math.max(1, (percentage / 100) * 14.6)}
-				height="5.6"
-				rx="1.1"
-				fill={low ? "#ff453a" : "#72ef64"}
-			/>
-		</svg>
-	);
-}
 
 function clockLabel(date: Date): string {
 	return date
@@ -100,7 +65,9 @@ export function SectionHeader({
 
 			<div className="sp-battery-wrap">
 				<span className="sp-battery-level">{batteryLevel}%</span>
-				<HeaderBattery level={batteryLevel} charging={isCharging} />
+				<span className="sp-battery">
+					<BatteryIcon level={batteryLevel} charging={isCharging} />
+				</span>
 			</div>
 		</header>
 	);

@@ -169,8 +169,8 @@ export function ScreenTimePanel({
 	const [weekOffset, setWeekOffset] = useState(0);
 	const [limitOverride, setLimitOverride] = useState<number | null>(null);
 	const [limitOpen, setLimitOpen] = useState(false);
-	const [draftHour, setDraftHour] = useState(8);
-	const [draftMinute, setDraftMinute] = useState(0);
+	const [draftHour, setDraftHour] = useState("8");
+	const [draftMinute, setDraftMinute] = useState("0");
 	const [alertVisible, setAlertVisible] = useState(false);
 	const [icons, setIcons] = useState<Record<string, string | null>>({});
 	const menuRef = useRef<HTMLDivElement>(null);
@@ -353,15 +353,25 @@ export function ScreenTimePanel({
 		return () => window.clearTimeout(timer);
 	}, [alertVisible]);
 
+	/** Keep a typed draft inside its dropdown-era range: digits only, two
+	 *  characters, no more than the old select offered. */
+	const clampDraft = (raw: string, max: number) => {
+		const digits = raw.replace(/\D+/g, "").slice(0, 2);
+		if (!digits) return "";
+		return String(Math.min(max, parseInt(digits, 10)));
+	};
+
 	const openLimitEditor = () => {
 		const minutes = Math.round(limit / 60);
-		setDraftHour(Math.min(12, Math.floor(minutes / 60)));
-		setDraftMinute(minutes % 60);
+		setDraftHour(String(Math.min(12, Math.floor(minutes / 60))));
+		setDraftMinute(String(minutes % 60));
 		setLimitOpen(true);
 	};
 
 	const saveLimit = async () => {
-		const seconds = Math.max(15 * 60, Math.min(24 * 60 * 60, draftHour * 3600 + draftMinute * 60));
+		const hour = parseInt(draftHour, 10) || 0;
+		const minute = parseInt(draftMinute, 10) || 0;
+		const seconds = Math.max(15 * 60, Math.min(24 * 60 * 60, hour * 3600 + minute * 60));
 		try {
 			const saved = await invoke<number>("set_screen_time_limit", { seconds });
 			setLimitOverride(saved);
@@ -585,30 +595,30 @@ export function ScreenTimePanel({
 					<div className="st-modal-card" role="dialog" aria-modal="true" aria-label="Daily limit">
 						<div className="st-modal-title">Daily limit</div>
 						<div className="st-modal-controls">
-							<select
+							<input
 								className="st-select"
+								type="text"
+								inputMode="numeric"
 								value={draftHour}
-								onChange={(event) => setDraftHour(Number(event.target.value))}
+								onChange={(event) => setDraftHour(clampDraft(event.target.value, 12))}
+								onBlur={(event) => {
+									if (!event.target.value) setDraftHour("0");
+								}}
 								aria-label="Hours"
-							>
-								{Array.from({ length: 13 }, (_, hour) => (
-									<option value={hour} key={hour}>
-										{hour}h
-									</option>
-								))}
-							</select>
-							<select
+								placeholder="h"
+							/>
+							<input
 								className="st-select"
+								type="text"
+								inputMode="numeric"
 								value={draftMinute}
-								onChange={(event) => setDraftMinute(Number(event.target.value))}
+								onChange={(event) => setDraftMinute(clampDraft(event.target.value, 59))}
+								onBlur={(event) => {
+									if (!event.target.value) setDraftMinute("0");
+								}}
 								aria-label="Minutes"
-							>
-								{Array.from({ length: 12 }, (_, step) => step * 5).map((minute) => (
-									<option value={minute} key={minute}>
-										{`${minute}`.padStart(2, "0")}m
-									</option>
-								))}
-							</select>
+								placeholder="m"
+							/>
 						</div>
 						<div className="st-modal-actions">
 							<button type="button" className="st-modal-btn" onClick={() => setLimitOpen(false)}>

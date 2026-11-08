@@ -89,7 +89,6 @@
 }
 
 .sp-nav:hover {
-	color: var(--sp-green);
 	background: rgba(255, 255, 255, 0.05);
 }
 
@@ -753,6 +752,12 @@
 .st-select:focus-visible {
 	outline: 1px solid rgba(255, 255, 255, 0.4);
 	outline-offset: 1px;
+}
+
+/* An input variant of st-select: text affordance instead of the list pointer. */
+.st-select:is(input) {
+	cursor: text;
+	caret-color: var(--sp-text);
 }
 
 .st-select option {

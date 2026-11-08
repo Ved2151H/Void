@@ -361,7 +361,7 @@ export function SystemPanel({
 									disabled={!media.active}
 									aria-label={media.playing ? "Pause" : "Play"}
 								>
-									{media.playing ? <Pause size={15} /> : <Play size={15} />}
+									{media.playing ? <Pause size={14} /> : <Play size={14} />}
 								</button>
 								<button
 									type="button"
