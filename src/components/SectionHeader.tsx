@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, EthernetPort, Wifi, WifiOff } from "lucide-react";
 import { BatteryIcon } from "../icons";
+import { batteryColor } from "../batteryTooltip";
 import "./SectionPanels.css";
 
 function clockLabel(date: Date): string {
@@ -64,7 +65,9 @@ export function SectionHeader({
 			</div>
 
 			<div className="sp-battery-wrap">
-				<span className="sp-battery-level">{batteryLevel}%</span>
+				<span className="sp-battery-level" style={{ color: batteryColor(batteryLevel, isCharging) }}>
+					{batteryLevel}%
+				</span>
 				<span className="sp-battery">
 					<BatteryIcon level={batteryLevel} charging={isCharging} />
 				</span>

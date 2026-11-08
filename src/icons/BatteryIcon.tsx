@@ -1,11 +1,12 @@
+import { batteryColor } from "../batteryTooltip";
+
 /** The laptop battery glyph — the one battery icon used across all sections. */
 interface BatteryIconProps {
 	charging: boolean;
 	level: number;
-	threshold?: number;
 }
 
-export function BatteryIcon({ charging, level, threshold = 20 }: BatteryIconProps) {
+export function BatteryIcon({ charging, level }: BatteryIconProps) {
 	const percentage = Math.min(Math.max(level, 0), 100);
 
 	return (
@@ -45,7 +46,7 @@ export function BatteryIcon({ charging, level, threshold = 20 }: BatteryIconProp
 					width={Math.max(0.5, (percentage / 100) * 10.4)}
 					height="5"
 					rx="1"
-					fill={charging ? "#32D74B" : percentage <= threshold ? "#FF453A" : "white"}
+					fill={batteryColor(percentage, charging)}
 				/>
 			</svg>
 			{/* Charging Bolt - Centered on the battery body */}

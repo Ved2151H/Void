@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "./updater";
-import { batteryTooltip, type BatteryDetails } from "./batteryTooltip";
+import { batteryTooltip, batteryColor, type BatteryDetails } from "./batteryTooltip";
 import {
 	createRegionSender,
 	measureElements,
@@ -2906,12 +2906,10 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 						batterySaverEnabled
 					),
 					<>
-						<BatteryIcon
-							charging={isCharging}
-							level={batteryLevel}
-							threshold={lowBatteryThreshold}
-						/>
-						<span className="label">{batteryLevel}%</span>
+						<BatteryIcon charging={isCharging} level={batteryLevel} />
+						<span className="label" style={{ color: batteryColor(batteryLevel, isCharging) }}>
+							{batteryLevel}%
+						</span>
 					</>,
 					refreshBatteryDetails
 				);
@@ -3564,11 +3562,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 																className="power-pulse-content"
 															>
 																{updateAvailable && <GreenDownArrowIcon />}
-																<BatteryIcon
-																	charging={isCharging}
-																	level={batteryLevel}
-																	threshold={lowBatteryThreshold}
-																/>
+																<BatteryIcon charging={isCharging} level={batteryLevel} />
 																<span
 																	className="label"
 																	style={{ color: showLowBatteryPulse ? "#FF453A" : "inherit" }}

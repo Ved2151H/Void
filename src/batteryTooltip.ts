@@ -19,6 +19,16 @@ export function formatDuration(seconds: number): string {
 	return rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`;
 }
 
+/** The one tiered battery color: green while charging, red below 30%,
+ *  yellow between 30-49%, green from 50% up. Used by every battery glyph
+ *  and the "x%" label next to it. */
+export function batteryColor(level: number, charging: boolean): string {
+	if (charging) return "#32d74b";
+	if (level < 30) return "#ff453a";
+	if (level < 50) return "#ff9f0a";
+	return "#32d74b";
+}
+
 /**
  * The battery widget's tooltip: the taskbar battery icon's status line, then
  * what Windows' battery settings add. Until the details arrive (or on a
