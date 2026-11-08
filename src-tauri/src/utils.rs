@@ -490,6 +490,7 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
         // 2. Control visibility of the primary taskbar
         let mut primary_positioned = true;
         {
+            use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
             use windows::Win32::UI::WindowsAndMessaging::{
                 GetWindowLongA, SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos,
                 GWL_EXSTYLE, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_LAYERED,
@@ -524,6 +525,7 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
                     }
                 }
                 let _ = ShowWindow(tray_hwnd, SW_SHOW);
+                let _ = EnableWindow(tray_hwnd, true);
             } else {
                 if let Ok(mut guard) = ORIGINAL_TRAY_RECT.lock() {
                     if guard.is_none() {
@@ -531,6 +533,7 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
                     }
                 }
                 let _ = ShowWindow(tray_hwnd, SW_HIDE);
+                let _ = EnableWindow(tray_hwnd, false);
                 // Move it far off-screen to prevent any "thin line" artifacts or flashes
                 let _ = SetWindowPos(
                     tray_hwnd,
@@ -547,6 +550,7 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
         // 3. Control every secondary taskbar (multi-monitor)
         let mut secondary_positioned = true;
         for &secondary_tray_hwnd in &secondary_trays {
+            use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
             use windows::Win32::UI::WindowsAndMessaging::{
                 SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
             };
@@ -569,8 +573,10 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) -> bool {
                     .is_ok();
                 }
                 let _ = ShowWindow(secondary_tray_hwnd, SW_SHOW);
+                let _ = EnableWindow(secondary_tray_hwnd, true);
             } else {
                 let _ = ShowWindow(secondary_tray_hwnd, SW_HIDE);
+                let _ = EnableWindow(secondary_tray_hwnd, false);
                 let _ = SetWindowPos(
                     secondary_tray_hwnd,
                     None,

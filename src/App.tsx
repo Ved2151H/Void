@@ -31,6 +31,7 @@ import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
 import { useInteractionState } from "./hooks/useInteractionState";
 import { useAnnouncement } from "./hooks/useAnnouncement";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
+import { useMediaControls } from "./hooks/useMediaControls";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
@@ -420,18 +421,6 @@ const RollDigit = memo(function RollDigit({
 	);
 });
 
-interface MediaInfo {
-	title: string;
-	artist: string;
-	is_playing: boolean;
-	has_media: boolean;
-	artwork?: string[];
-	position_ms?: number;
-	duration_ms?: number;
-	seek_enabled?: boolean;
-	position_updated_at?: number;
-}
-
 interface WifiStatus {
 	enabled: boolean;
 	connected: boolean;
@@ -681,16 +670,17 @@ function App() {
 
 	// Weather state (managed by useWeather hook)
 
-	// Media state
-	const [isPlaying, setIsPlaying] = useState(false);
-	const [mediaInfo, setMediaInfo] = useState<MediaInfo>({
-		title: "",
-		artist: "",
-		is_playing: false,
-		has_media: false
-	});
-	const [albumArtUrl, setAlbumArtUrl] = useState<string | null>(null);
-	const [albumArtKey, setAlbumArtKey] = useState(0);
+	// Media state (rendering state stays here; the Windows media session,
+	// its listener and its playback commands live in the hook)
+	const {
+		mediaInfo,
+		isPlaying,
+		albumArtUrl,
+		albumArtKey,
+		togglePlayPause,
+		skipNext,
+		skipPrevious
+	} = useMediaControls();
 	const [volume, setVolume] = useState(0.5);
 	const [isMuted, setIsMuted] = useState(false);
 	// Sliders show 0 while muted, matching the overlay HUD.
@@ -2670,82 +2660,6 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		};
 	}, []);
 
-	// Native Windows Media Controls - Listen for updates from background worker
-	useEffect(() => {
-		const unlisten = listen<MediaInfo>("media-update", (event) => {
-			const info = event.payload;
-			if (!info) return;
-
-			setMediaInfo((prev) => {
-				// Find if artwork changed by checking the first element
-				const prevArt = prev.artwork?.[0];
-				const nextArt = info.artwork?.[0];
-				const artChanged = prevArt !== nextArt;
-
-				if (
-					prev.title === info.title &&
-					prev.artist === info.artist &&
-					prev.is_playing === info.is_playing &&
-					prev.has_media === info.has_media &&
-					!artChanged &&
-					prev.position_ms === info.position_ms &&
-					prev.duration_ms === info.duration_ms
-				) {
-					return prev;
-				}
-
-				// Update playing state separately for the hook triggers
-				setIsPlaying(info.is_playing);
-
-				if (info.artwork && info.artwork.length > 0) {
-					const newArt = info.artwork[0];
-					setAlbumArtUrl((prev) => {
-						if (prev !== newArt) {
-							setAlbumArtKey((k) => k + 1);
-							return newArt;
-						}
-						return prev;
-					});
-				} else {
-					setAlbumArtUrl(null);
-				}
-
-				return info;
-			});
-		});
-
-		return () => {
-			unlisten.then((fn) => fn());
-		};
-	}, []);
-
-	// Media controls via Tauri commands
-	/* Unused saveAndBroadcast removed to fix TS build error */
-	const togglePlayPause = useCallback(async () => {
-		try {
-			await invoke("media_play_pause");
-			setIsPlaying(!isPlaying);
-		} catch (e) {
-			console.error("Failed to toggle play/pause:", e);
-		}
-	}, [isPlaying]);
-
-	const skipNext = useCallback(async () => {
-		try {
-			await invoke("media_next");
-		} catch (e) {
-			console.error("Failed to skip next:", e);
-		}
-	}, []);
-
-	const skipPrevious = useCallback(async () => {
-		try {
-			await invoke("media_previous");
-		} catch (e) {
-			console.error("Failed to skip previous:", e);
-		}
-	}, []);
-
 	// Slide-push animation for prev/next buttons
 	const prevFront = useAnimation();
 	const prevBack = useAnimation();
@@ -2781,14 +2695,6 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		},
 		[sendVolume]
 	);
-
-	const toggleMute = useCallback(() => {
-		if (isMuted || volume === 0) {
-			handleVolumeChange(volume > 0 ? volume : 0.5);
-		} else {
-			handleVolumeChange(0);
-		}
-	}, [handleVolumeChange, isMuted, volume]);
 
 	// WiFi toggle
 	const toggleWifi = useCallback(async () => {
@@ -3134,7 +3040,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 					kind === "wifi"
 						? (ssid ?? "No Network")
 						: kind === "lan"
-							? "LAN"
+							? (networkWidget?.name ?? "LAN")
 							: "No Network";
 				const tooltip =
 					kind === "wifi"
@@ -4312,13 +4218,18 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 												cpuUsage={cpuUsage}
 												ramUsage={ramUsage}
 												diskUsage={diskUsage}
+												media={{
+													title: mediaInfo.title,
+													artist: mediaInfo.artist,
+													playing: isPlaying,
+													active: mediaInfo.has_media
+												}}
 												netUpSpeed={netUpSpeed}
 												netDownSpeed={netDownSpeed}
 												network={networkWidget}
-												volume={volume}
-												isMuted={isMuted}
-												onVolumeChange={handleVolumeChange}
-												onToggleMute={toggleMute}
+												onMediaPrev={skipPrevious}
+												onMediaNext={skipNext}
+												onTogglePlayPause={togglePlayPause}
 												onRefreshBattery={refreshBatteryDetails}
 												onPrev={() => cyclePanel(-1)}
 												onNext={() => cyclePanel(1)}

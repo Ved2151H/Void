@@ -3726,6 +3726,17 @@ pub fn register_dock_appbar(window: tauri::WebviewWindow) {
     register_dock_appbar_inner(window, 0);
 }
 
+fn schedule_dock_appbar_retry(window: tauri::WebviewWindow, attempt: i32) {
+    if attempt >= 20 {
+        return;
+    }
+    let w = window.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        register_dock_appbar_inner(w, attempt + 1);
+    });
+}
+
 static DOCK_APPBAR_LOCK: Mutex<()> = Mutex::new(());
 
 fn lock_dock_appbar() -> std::sync::MutexGuard<'static, ()> {
@@ -3759,7 +3770,7 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
         // window has rendered. Never guess a value — bail and let the retry wrapper handle it.
         let ph = window.outer_size().map(|s| s.height as i32).unwrap_or(0);
         if ph <= 0 {
-            if attempt < 10 {
+            if attempt < 20 {
                 let w = window.clone();
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -3815,6 +3826,8 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
                 );
                 if registered == 0 {
                     eprintln!("Bloom: dock AppBar registration failed");
+                    drop(_guard);
+                    schedule_dock_appbar_retry(window.clone(), attempt);
                     return;
                 }
                 DOCK_APPBAR_REGISTERED.store(true, Ordering::Relaxed);
@@ -3836,6 +3849,8 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
             let final_y = m_pos.y + m_size.height as i32 - ph;
             let final_width = abd.rc.right - abd.rc.left;
             if final_width <= 0 {
+                drop(_guard);
+                schedule_dock_appbar_retry(window.clone(), attempt);
                 return;
             }
 
@@ -3865,6 +3880,8 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
                 )
                 .is_err()
             {
+                drop(_guard);
+                schedule_dock_appbar_retry(window.clone(), attempt);
                 return;
             }
             let mut placed = RECT::default();
@@ -3874,6 +3891,8 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
                 || placed.right - placed.left != final_width
                 || placed.bottom - placed.top != ph
             {
+                drop(_guard);
+                schedule_dock_appbar_retry(window.clone(), attempt);
                 return;
             }
 
@@ -3882,6 +3901,8 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
 
             // Always ensure the window is visible — show() is idempotent
             if !window.is_visible().unwrap_or(false) && window.show().is_err() {
+                drop(_guard);
+                schedule_dock_appbar_retry(window.clone(), attempt);
                 return;
             }
             if window.is_visible().unwrap_or(false) && set_taskbar_visibility(false, false) {
@@ -3891,7 +3912,7 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
     } else {
         let w = window.clone();
         tauri::async_runtime::spawn(async move {
-            for _ in 0..10 {
+            for _ in 0..20 {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 if let Ok(Some(_monitor)) = w.app_handle().primary_monitor() {
                     register_dock_appbar(w);
@@ -4233,7 +4254,7 @@ pub fn unregister_appbar_native(hwnd: HWND) {
     }
 }
 
-fn reposition_all_windows(app_handle: &AppHandle) {
+pub fn reposition_all_windows(app_handle: &AppHandle) {
     if SHUTTING_DOWN.load(Ordering::Relaxed) {
         return;
     }

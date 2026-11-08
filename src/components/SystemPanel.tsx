@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
 import {
 	BatteryCharging,
 	Cpu,
-	ExternalLink,
 	HardDrive,
 	MemoryStick,
-	MonitorSpeaker,
-	Volume2,
-	VolumeX,
+	Music,
+	Pause,
+	Play,
+	SkipBack,
+	SkipForward,
 	Wifi,
 	WifiOff,
 	EthernetPort
@@ -29,6 +29,13 @@ interface NetworkState {
 	name: string | null;
 }
 
+interface SystemPanelMedia {
+	title: string | null;
+	artist: string | null;
+	playing: boolean;
+	active: boolean;
+}
+
 interface SystemPanelProps {
 	batteryLevel: number;
 	isCharging: boolean;
@@ -36,13 +43,14 @@ interface SystemPanelProps {
 	cpuUsage: number;
 	ramUsage: number;
 	diskUsage: DiskUsage | null;
+	media: SystemPanelMedia;
 	netUpSpeed: number;
 	netDownSpeed: number;
 	network: NetworkState | null;
-	volume: number;
-	isMuted: boolean;
-	onVolumeChange: (volume: number) => void;
-	onToggleMute: () => void;
+
+	onMediaPrev: () => void;
+	onMediaNext: () => void;
+	onTogglePlayPause: () => void;
 	onRefreshBattery: () => void;
 	onPrev: () => void;
 	onNext: () => void;
@@ -115,21 +123,17 @@ export function SystemPanel({
 	cpuUsage,
 	ramUsage,
 	diskUsage,
+	media,
 	netUpSpeed,
 	netDownSpeed,
 	network,
-	volume,
-	isMuted,
-	onVolumeChange,
-	onToggleMute,
+	onMediaPrev,
+	onMediaNext,
+	onTogglePlayPause,
 	onRefreshBattery,
 	onPrev,
 	onNext
 }: SystemPanelProps) {
-	const [output, setOutput] = useState<string | null>(null);
-	const [outputReady, setOutputReady] = useState(false);
-	const mounted = useRef(true);
-
 	const [netHistory, setNetHistory] = useState<Array<{ down: number; up: number }>>([
 		{ down: netDownSpeed, up: netUpSpeed }
 	]);
@@ -137,32 +141,6 @@ export function SystemPanel({
 	useEffect(() => {
 		setNetHistory((history) => [...history.slice(-23), { down: netDownSpeed, up: netUpSpeed }]);
 	}, [netDownSpeed, netUpSpeed]);
-
-	const loadOutput = async () => {
-		try {
-			const name = await invoke<string | null>("get_audio_output");
-			if (mounted.current) {
-				setOutput(name);
-				setOutputReady(true);
-			}
-		} catch (error) {
-			console.error("Failed to read audio output:", error);
-			if (mounted.current) {
-				setOutput(null);
-				setOutputReady(true);
-			}
-		}
-	};
-
-	useEffect(() => {
-		mounted.current = true;
-		void loadOutput();
-		return () => {
-			mounted.current = false;
-		};
-		// loadOutput only reads state setters.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
 
 	// Battery details are read when the section opens and again only when the
 	// webview reports a level or charging change, so there is no extra timer.
@@ -214,9 +192,6 @@ export function SystemPanel({
 
 	const diskPercent = diskUsage ? Math.round(diskUsage.used_percent) : null;
 	const diskFree = diskUsage ? `${diskUsage.free_gb.toFixed(1)} GB free` : "Reading disk…";
-	const outputName = outputReady ? output ?? "No output device" : "Reading output device…";
-	const displayVolume = isMuted ? 0 : volume;
-	const volumePercent = Math.round(displayVolume * 100);
 
 	return (
 		<div className="sp-root" onClick={(event) => event.stopPropagation()}>
@@ -308,94 +283,96 @@ export function SystemPanel({
 						</div>
 						<div className="sys-metrics">
 							<div className="sys-metric">
-								<span className="sys-metric-name">
-									<Cpu size={8} strokeWidth={2.2} />
-									CPU
-								</span>
-								<div className="sys-metric-center">
+								<div className="sys-metric-head">
+									<span className="sys-metric-name">
+										<Cpu size={8} strokeWidth={2.2} />
+										CPU
+									</span>
 									<span className="sys-metric-value">{Math.round(cpuUsage)}%</span>
-									<span className="sys-metric-track">
-										<span style={{ width: `${Math.min(100, Math.max(0, cpuUsage))}%` }} />
-									</span>
 								</div>
+								<span className="sys-metric-track">
+									<span style={{ width: `${Math.min(100, Math.max(0, cpuUsage))}%` }} />
+								</span>
 							</div>
 
 							<div className="sys-metric">
-								<span className="sys-metric-name">
-									<MemoryStick size={8} strokeWidth={2.2} />
-									RAM
-								</span>
-								<div className="sys-metric-center">
+								<div className="sys-metric-head">
+									<span className="sys-metric-name">
+										<MemoryStick size={8} strokeWidth={2.2} />
+										RAM
+									</span>
 									<span className="sys-metric-value">{Math.round(ramUsage)}%</span>
-									<span className="sys-metric-track">
-										<span style={{ width: `${Math.min(100, Math.max(0, ramUsage))}%` }} />
-									</span>
 								</div>
+								<span className="sys-metric-track">
+									<span style={{ width: `${Math.min(100, Math.max(0, ramUsage))}%` }} />
+								</span>
 							</div>
 
 							<div className="sys-metric">
-								<span className="sys-metric-name">
-									<HardDrive size={8} strokeWidth={2.2} />
-									Disk
-								</span>
-								<div className="sys-metric-center">
-									<span className="sys-metric-value">
-										{diskPercent === null ? "—" : `${diskPercent}%`}
+								<div className="sys-metric-head">
+									<span className="sys-metric-name">
+										<HardDrive size={8} strokeWidth={2.2} />
+										Disk
 									</span>
-									<span className="sys-metric-track">
-										<span style={{ width: `${diskPercent ?? 0}%` }} />
+									<span className="sys-metric-side">
+										<span className="sys-disk-free">{diskFree}</span>
+										<span className="sys-metric-value">
+											{diskPercent === null ? "—" : `${diskPercent}%`}
+										</span>
 									</span>
-									<span className="sys-disk-free">{diskFree}</span>
 								</div>
+								<span className="sys-metric-track">
+									<span style={{ width: `${diskPercent ?? 0}%` }} />
+								</span>
 							</div>
 						</div>
 					</section>
 
-					<section className="sp-card sys-card sys-audio">
-						<div className="sys-audio-head">
+					<section className="sp-card sys-card sys-media">
+						<div className="sys-card-head">
 							<span className="sys-card-title">
-								<Volume2 size={12} strokeWidth={2.2} />
-								Audio
+								<Music size={12} strokeWidth={2.2} />
+								Media
 							</span>
 						</div>
-						<div className="sys-audio-name" title={outputName}>
-							{outputName}
-						</div>
-						<div className="sys-volume-row">
-							<span className="sys-volume-value">{volumePercent}%</span>
-							<button
-								type="button"
-								className={`sys-mute${isMuted ? " active" : ""}`}
-								onClick={onToggleMute}
-								aria-label={isMuted ? "Unmute" : "Mute"}
-								title={isMuted ? "Unmute" : "Mute"}
-							>
-								{isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
-							</button>
-							<div className="sys-volume-track">
-								<span className="sys-volume-fill" style={{ width: `${volumePercent}%` }} />
-								<span className="sys-volume-knob" style={{ left: `${volumePercent}%` }} />
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.01"
-									value={displayVolume}
-									onChange={(event) => onVolumeChange(parseFloat(event.target.value))}
-									aria-label="Output volume"
-								/>
+						<div className="sys-media-body">
+							<span className="sys-media-title">
+								{media.active ? media.title || "Unknown track" : "No media playing"}
+							</span>
+							<span className="sys-media-artist">
+								{media.active
+									? media.artist || "Unknown artist"
+									: "Open a player app to control playback"}
+							</span>
+							<div className="sys-media-controls">
+								<button
+									type="button"
+									className="sys-media-btn"
+									onClick={onMediaPrev}
+									disabled={!media.active}
+									aria-label="Previous track"
+								>
+									<SkipBack size={14} />
+								</button>
+								<button
+									type="button"
+									className="sys-media-btn sys-media-play"
+									onClick={onTogglePlayPause}
+									disabled={!media.active}
+									aria-label={media.playing ? "Pause" : "Play"}
+								>
+									{media.playing ? <Pause size={15} /> : <Play size={15} />}
+								</button>
+								<button
+									type="button"
+									className="sys-media-btn"
+									onClick={onMediaNext}
+									disabled={!media.active}
+									aria-label="Next track"
+								>
+									<SkipForward size={14} />
+								</button>
 							</div>
-							<Volume2 size={13} strokeWidth={2} className="sys-speaker-end" />
-						</div>
-						<div className="sys-audio-bottom">
-							<span>
-								<MonitorSpeaker size={10} strokeWidth={2} />
-								Default output device
-							</span>
-							<span>
-								Windows volume
-								<ExternalLink size={9} strokeWidth={2} />
-							</span>
 						</div>
 					</section>
 				</div>

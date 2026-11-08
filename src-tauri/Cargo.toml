@@ -1,6 +1,6 @@
 [package]
 name = "void"
-version = "4.0.1"
+version = "5.1.0"
 description = ""
 authors = ["sehaz"]
 edition = "2021"

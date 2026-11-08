@@ -499,40 +499,31 @@ fn wlan_adapter_guids() -> Vec<GUID> {
 /// Returns the interface's GUID, friendly alias and description.
 fn active_default_route_interface() -> Option<(GUID, String, String)> {
     use windows::Win32::NetworkManagement::IpHelper::{
-        FreeMibTable, GetIfEntry2, GetIpForwardTable2, MIB_IPFORWARD_TABLE2, MIB_IPFORWARD_ROW2,
+        GetBestInterface, GetIfEntry2, MIB_IF_ROW2,
     };
 
-    // Default routes (prefix length 0) of the first family that has any,
-    // cheapest metric first. The Windows host's choices come from its v4
-    // table first; IPv6 carries it only when v4 routes are gone. The rows
-    // are copied out before the table is released.
-    let mut forward: *mut MIB_IPFORWARD_TABLE2 = std::ptr::null_mut();
-    let ret = unsafe { GetIpForwardTable2(windows::Win32::Networking::WinSock::AF_INET, &mut forward) };
-    if !ret.is_ok() || forward.is_null() {
+    // Ask the IP stack which interface it would actually use for a default
+    // destination. This honours the per-interface metric (Ethernet is preferred
+    // over Wi-Fi even when both publish a 0-metric route), unlike sorting the
+    // raw forward table by route metric alone.
+    let mut if_index: u32 = 0;
+    let ret = unsafe { GetBestInterface(0, &mut if_index) };
+    if ret != 0 || if_index == 0 {
         return None;
     }
-    let mut active_routes: Vec<(u32, u32)> = unsafe {
-        std::slice::from_raw_parts(
-            std::ptr::addr_of!((*forward).Table).cast::<MIB_IPFORWARD_ROW2>(),
-            (*forward).NumEntries as usize,
-        )
-        .iter()
-        // The loopback interface never owns a real default route.
-        .filter(|r| r.DestinationPrefix.PrefixLength == 0 && r.InterfaceIndex != 0)
-        .map(|r| (r.InterfaceIndex, r.Metric))
-        .collect()
-    };
-    unsafe { FreeMibTable(forward.cast()) };
-    active_routes.sort_by_key(|&(_, metric)| metric);
-    let &(interface_index, _) = active_routes.first()?;
 
-    let mut entry =
-        windows::Win32::NetworkManagement::IpHelper::MIB_IF_ROW2 {
-            InterfaceIndex: interface_index,
-            ..Default::default()
-        };
+    let mut entry = MIB_IF_ROW2 {
+        InterfaceIndex: if_index,
+        ..Default::default()
+    };
     let ret = unsafe { GetIfEntry2(&mut entry) };
     if !ret.is_ok() {
+        return None;
+    }
+    // Loopback / down interfaces must not be treated as a real connection.
+    if entry.OperStatus != windows::Win32::NetworkManagement::Ndis::IfOperStatusUp
+        || entry.Type == 24
+    {
         return None;
     }
     Some((
@@ -540,6 +531,20 @@ fn active_default_route_interface() -> Option<(GUID, String, String)> {
         wide_to_string(&entry.Alias),
         wide_to_string(&entry.Description),
     ))
+}
+
+/// Best-effort name of the network Windows is currently using, from the
+/// connection profile (e.g. "Home"), rather than the adapter's hardware name.
+fn connection_profile_name() -> Option<String> {
+    use windows::Networking::Connectivity::NetworkInformation;
+    let profile = NetworkInformation::GetInternetConnectionProfile().ok()?;
+    let name = profile.ProfileName().ok()?;
+    let name = name.to_string();
+    if name.trim().is_empty() {
+        None
+    } else {
+        Some(name)
+    }
 }
 
 /// The connection Windows is actually using: Wi-Fi (with SSID) when the
@@ -560,11 +565,14 @@ pub fn network_widget_state() -> Result<NetworkWidgetState, String> {
             })
         }
         // Every routed-over interface that isn't the Wi-Fi adapter counts as
-        // the LAN side (ethernet, VPN, USB dongles), labelled with its name.
-        Some((_guid, _alias, description)) => Ok(NetworkWidgetState {
+        // the LAN side (ethernet, VPN, USB dongles), labelled with the
+        // connection's profile name (e.g. "Home") instead of the adapter.
+        Some((_guid, alias, description)) => Ok(NetworkWidgetState {
             kind: "lan",
             ssid: None,
-            name: if description.is_empty() { None } else { Some(description) },
+            name: connection_profile_name()
+                .or_else(|| if description.is_empty() { None } else { Some(description) })
+                .or_else(|| if alias.is_empty() { None } else { Some(alias) }),
         }),
         // No default route at all: an associated Wi-Fi adapter still counts
         // as connected (association can outlive a momentarily missing route).
@@ -573,7 +581,7 @@ pub fn network_widget_state() -> Result<NetworkWidgetState, String> {
             Ok(NetworkWidgetState {
                 kind: if ssid.is_some() { "wifi" } else { "none" },
                 ssid,
-                name: None,
+                name: connection_profile_name(),
             })
         }
     }

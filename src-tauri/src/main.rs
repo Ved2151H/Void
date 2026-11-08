@@ -422,6 +422,16 @@ fn main() {
             setup_audio_visualization(app.handle().clone());
             setup_settings_watcher(app.handle().clone());
             diagnostics::record("services_ready", "hooks and settings watcher initialized");
+            // Late startup recovery: autostart can race Explorer/shell readiness, so
+            // re-run window positioning a few seconds later to make sure the dock
+            // actually appears when it is enabled in settings.
+            {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    services::reposition_all_windows(&app_handle);
+                });
+            }
             wifi::setup_wifi_notifications(app.handle().clone());
             bluetooth::setup_bluetooth_notifications(app.handle().clone());
             usb::setup_usb_notifications(app.handle().clone());
