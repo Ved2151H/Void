@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { Power, Download, Clock, BatteryWarning, RefreshCw, RotateCcw, LogOut, Info } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
@@ -28,6 +30,12 @@ export function GeneralTab({
 	resetToDefaults,
 	quitBloom
 }: GeneralTabProps) {
+	const [version, setVersion] = useState("…");
+	useEffect(() => {
+		getVersion()
+			.then(setVersion)
+			.catch(() => setVersion("unknown"));
+	}, []);
 	return (
 		<>
 			<div className="setting-group-label">System</div>
@@ -78,7 +86,7 @@ export function GeneralTab({
 			<div className="setting-group-label">App</div>
 			<div className="setting-group">
 				<SettingRow icon={Info} label="Version" desc="Current app version">
-					<span className="setting-version">v4</span>
+					<span className="setting-version">v{version}</span>
 				</SettingRow>
 				<SettingRow
 					icon={RotateCcw}
