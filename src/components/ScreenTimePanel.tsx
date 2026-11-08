@@ -370,15 +370,11 @@ export function ScreenTimePanel({
 		setLimitOpen(true);
 	};
 
-	const adjustLimit = async (deltaSeconds: number) => {
-		const next = Math.max(15 * 60, Math.min(24 * 60 * 60, limit + deltaSeconds));
-		if (next === limit) return;
-		try {
-			const saved = await invoke<number>("set_screen_time_limit", { seconds: next });
-			setLimitOverride(saved);
-		} catch (error) {
-			console.error("Failed to adjust the daily limit:", error);
-		}
+	const stepDraft = (deltaMinutes: number) => {
+		let total = (parseInt(draftHour, 10) || 0) * 60 + (parseInt(draftMinute, 10) || 0) + deltaMinutes;
+		total = Math.max(15, Math.min(24 * 60, total));
+		setDraftHour(String(Math.floor(total / 60)));
+		setDraftMinute(String(total % 60));
 	};
 
 	const saveLimit = async () => {
@@ -451,39 +447,17 @@ export function ScreenTimePanel({
 							</strong>
 						</div>
 
-						<div className="st-stat st-stat-limit">
-							<button
-								type="button"
-								className="st-stat st-stat-button st-stat-limit-main"
-								onClick={openLimitEditor}
-								title="Change the daily limit"
-								aria-label={`Daily limit ${duration(limit)}. Change it`}
-							>
-								<Clock3 size={12} strokeWidth={2} />
-								<span className="st-stat-label">Daily limit</span>
-								<strong className="st-stat-value">{duration(limit)}</strong>
-							</button>
-							<div className="st-limit-steps">
-								<button
-									type="button"
-									className="st-limit-step"
-									onClick={() => void adjustLimit(-30 * 60)}
-									aria-label="Decrease daily limit"
-									title="Decrease by 30 minutes"
-								>
-									<Minus size={10} strokeWidth={2.4} />
-								</button>
-								<button
-									type="button"
-									className="st-limit-step"
-									onClick={() => void adjustLimit(30 * 60)}
-									aria-label="Increase daily limit"
-									title="Increase by 30 minutes"
-								>
-									<Plus size={10} strokeWidth={2.4} />
-								</button>
-							</div>
-						</div>
+						<button
+							type="button"
+							className="st-stat st-stat-button"
+							onClick={openLimitEditor}
+							title="Change the daily limit"
+							aria-label={`Daily limit ${duration(limit)}. Change it`}
+						>
+							<Clock3 size={12} strokeWidth={2} />
+							<span className="st-stat-label">Daily limit</span>
+							<strong className="st-stat-value">{duration(limit)}</strong>
+						</button>
 					</div>
 
 					<div className="sp-card st-week">
@@ -656,6 +630,24 @@ export function ScreenTimePanel({
 							/>
 						</div>
 						<div className="st-modal-actions">
+							<button
+								type="button"
+								className="st-limit-step"
+								onClick={() => stepDraft(-30)}
+								aria-label="Decrease by 30 minutes"
+								title="Decrease by 30 minutes"
+							>
+								<Minus size={10} strokeWidth={2.4} />
+							</button>
+							<button
+								type="button"
+								className="st-limit-step"
+								onClick={() => stepDraft(30)}
+								aria-label="Increase by 30 minutes"
+								title="Increase by 30 minutes"
+							>
+								<Plus size={10} strokeWidth={2.4} />
+							</button>
 							<button type="button" className="st-modal-btn" onClick={() => setLimitOpen(false)}>
 								Cancel
 							</button>
