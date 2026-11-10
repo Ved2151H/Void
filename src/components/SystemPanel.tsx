@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
 	BatteryCharging,
+	ChevronLeft,
+	ChevronRight,
+	Clock3,
 	Cpu,
 	HardDrive,
 	MemoryStick,
-	Music,
-	Pause,
-	Play,
-	SkipBack,
-	SkipForward,
+	Triangle,
 	Wifi,
 	WifiOff,
 	EthernetPort
@@ -29,11 +29,14 @@ interface NetworkState {
 	name: string | null;
 }
 
-interface SystemPanelMedia {
-	title: string | null;
-	artist: string | null;
-	playing: boolean;
-	active: boolean;
+interface ScreenTimeDay {
+	date: string;
+	seconds: number;
+}
+
+interface ScreenTimeSnapshot {
+	today: string;
+	days: ScreenTimeDay[];
 }
 
 interface SystemPanelProps {
@@ -43,19 +46,93 @@ interface SystemPanelProps {
 	cpuUsage: number;
 	ramUsage: number;
 	diskUsage: DiskUsage | null;
-	media: SystemPanelMedia;
 	netUpSpeed: number;
 	netDownSpeed: number;
 	network: NetworkState | null;
 
-	onMediaPrev: () => void;
-	onMediaNext: () => void;
-	onTogglePlayPause: () => void;
 	onRefreshBattery: () => void;
 	onPrev: () => void;
 	onNext: () => void;
 	onOpenSettings: () => void;
 	onClose: () => void;
+}
+
+/**
+ * Header + the four system components (Power, Network, Performance and the
+ * full-width Time summary) from the reference, sized to fit them compactly
+ * without leftover empty space.
+ */
+export const SYSTEM_PANEL_HEIGHT = 344;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function splitDuration(seconds: number): { hours: number; minutes: number } {
+	const totalMinutes = Math.max(0, Math.round(seconds / 60));
+	return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
+}
+
+/** "7h 50m" with the unit letters smaller, matching the reference card. */
+function DurationText({ seconds }: { seconds: number }) {
+	const { hours, minutes } = splitDuration(seconds);
+	if (hours === 0) {
+		return (
+			<>
+				<em>{minutes}</em>
+				<small>m</small>
+			</>
+		);
+	}
+	return (
+		<>
+			<em>{hours}</em>
+			<small>h</small>
+			{minutes > 0 ? (
+				<>
+					{" "}
+					<em>{minutes}</em>
+					<small>m</small>
+				</>
+			) : null}
+		</>
+	);
+}
+
+function parseDate(value: string): Date {
+	const [year, month, day] = value.split("-").map(Number);
+	return new Date(year, month - 1, day);
+}
+
+function dateKey(date: Date): string {
+	const month = `${date.getMonth() + 1}`.padStart(2, "0");
+	const day = `${date.getDate()}`.padStart(2, "0");
+	return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function addDays(date: Date, days: number): Date {
+	const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+	next.setDate(next.getDate() + days);
+	return next;
+}
+
+function mondayOf(date: Date): Date {
+	const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+	return addDays(day, -((day.getDay() + 6) % 7));
+}
+
+function shortDay(value: string): string {
+	const date = parseDate(value);
+	return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
+function weekRangeLabel(start: Date, end: Date): string {
+	return `${shortDay(dateKey(start))} – ${shortDay(dateKey(end))}`;
+}
+
+function weekdayCaption(value: string, todayKey: string): string {
+	const date = parseDate(value);
+	const base = `${WEEKDAYS[date.getDay()]}, ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+	return value === todayKey ? `${base} · Today` : base;
 }
 
 function formatRate(bytesPerSecond: number): string {
@@ -113,8 +190,8 @@ function Sparkline({
 /**
  * System shows the same live signals the notch already samples (battery,
  * network widget, 3-second CPU/RAM/network counters), plus a disk reading and
- * the default audio endpoint. Nothing here is a placeholder: a value the
- * machine does not expose is shown as unavailable.
+ * a weekly screen-time summary from Void's ledger. Nothing here is a
+ * placeholder: a value the machine does not expose is shown as unavailable.
  */
 export function SystemPanel({
 	batteryLevel,
@@ -123,13 +200,9 @@ export function SystemPanel({
 	cpuUsage,
 	ramUsage,
 	diskUsage,
-	media,
 	netUpSpeed,
 	netDownSpeed,
 	network,
-	onMediaPrev,
-	onMediaNext,
-	onTogglePlayPause,
 	onRefreshBattery,
 	onPrev,
 	onNext
@@ -137,6 +210,23 @@ export function SystemPanel({
 	const [netHistory, setNetHistory] = useState<Array<{ down: number; up: number }>>([
 		{ down: netDownSpeed, up: netUpSpeed }
 	]);
+	const [screenTime, setScreenTime] = useState<ScreenTimeSnapshot | null>(null);
+	/** `null` means "now"; negative offsets step back through past weeks. */
+	const [weekOffset, setWeekOffset] = useState(0);
+
+	const loadScreenTime = useCallback(async () => {
+		try {
+			setScreenTime(await invoke<ScreenTimeSnapshot>("get_screen_time"));
+		} catch (error) {
+			console.error("Failed to read screen time:", error);
+		}
+	}, []);
+
+	useEffect(() => {
+		void loadScreenTime();
+		const interval = window.setInterval(() => void loadScreenTime(), 15_000);
+		return () => window.clearInterval(interval);
+	}, [loadScreenTime]);
 
 	useEffect(() => {
 		setNetHistory((history) => [...history.slice(-23), { down: netDownSpeed, up: netUpSpeed }]);
@@ -192,6 +282,51 @@ export function SystemPanel({
 
 	const diskPercent = diskUsage ? Math.round(diskUsage.used_percent) : null;
 	const diskFree = diskUsage ? `${diskUsage.free_gb.toFixed(1)} GB free` : "Reading disk…";
+
+	const todayKey = screenTime?.today ?? dateKey(new Date());
+	const byDate = new Map((screenTime?.days ?? []).map((day) => [day.date, day.seconds]));
+	// Week view. `weekOffset` is 0 for the current week and negative before it.
+	const currentWeekStart = mondayOf(parseDate(todayKey));
+	const earliest = screenTime?.days[0]?.date ?? todayKey;
+	const minWeekOffset = -Math.round(
+		(currentWeekStart.getTime() - mondayOf(parseDate(earliest)).getTime()) / 604_800_000
+	);
+	const weekStart = addDays(currentWeekStart, weekOffset * 7);
+	const weekEnd = addDays(weekStart, 6);
+	const weekDays = Array.from({ length: 7 }, (_, index) => {
+		const key = dateKey(addDays(weekStart, index));
+		return { key, seconds: byDate.get(key) ?? 0, future: key > todayKey };
+	});
+	const hasPrevWeek = weekOffset > minWeekOffset;
+	const hasNextWeek = weekOffset < 0;
+	const shiftWeek = (delta: number) => {
+		const next = Math.max(minWeekOffset, Math.min(0, weekOffset + delta));
+		if (next === weekOffset) return;
+		setWeekOffset(next);
+	};
+	const counted = weekDays.filter((day) => !day.future);
+	const used = counted.filter((day) => day.seconds > 0);
+	const weekTotal = used.reduce((sum, day) => sum + day.seconds, 0);
+	const weekAverage = used.length === 0 ? 0 : weekTotal / used.length;
+	const lowest = used.reduce<(typeof used)[number] | null>(
+		(best, day) => (best === null || day.seconds < best.seconds ? day : best),
+		null
+	);
+	const highest = used.reduce<(typeof used)[number] | null>(
+		(best, day) => (best === null || day.seconds > best.seconds ? day : best),
+		null
+	);
+	const hasUsage = used.length > 0;
+	const range = lowest && highest ? Math.max(1, highest.seconds - lowest.seconds) : 1;
+	const averagePct =
+		hasUsage && lowest
+			? Math.min(100, Math.max(0, ((weekAverage - lowest.seconds) / range) * 100))
+			: 50;
+
+	// A new day moves the current week on its own; drop the stale week selection.
+	useEffect(() => {
+		setWeekOffset(0);
+	}, [todayKey]);
 
 	return (
 		<div className="sp-root" onClick={(event) => event.stopPropagation()}>
@@ -328,50 +463,105 @@ export function SystemPanel({
 						</div>
 					</section>
 
-					<section className="sp-card sys-card sys-media">
-						<div className="sys-card-head">
-							<span className="sys-card-title">
-								<Music size={12} strokeWidth={2.2} />
-								Media
+					<section className="sp-card sys-card sys-time">
+						<div className="sys-time-head">
+							<span className="sys-time-head-group">
+								<button
+									type="button"
+									className="sys-time-arrow"
+									onClick={() => shiftWeek(-1)}
+									disabled={!hasPrevWeek}
+									aria-label="Previous week"
+								>
+									<ChevronLeft size={10} strokeWidth={2.6} />
+								</button>
+								<span className="sys-time-title">
+									<span className="sys-time-icon" aria-hidden="true">
+										<Clock3 size={13} strokeWidth={2.2} />
+									</span>
+									Time summary
+								</span>
+								<button
+									type="button"
+									className="sys-time-arrow"
+									onClick={() => shiftWeek(1)}
+									disabled={!hasNextWeek}
+									aria-label="Next week"
+								>
+									<ChevronRight size={10} strokeWidth={2.6} />
+								</button>
+							</span>
+							<span className="sys-time-range">{weekRangeLabel(weekStart, weekEnd)}</span>
+						</div>
+
+						<div className="sys-time-avg-block">
+							<span className="sys-time-avg-label">Weekly average</span>
+							<span className="sys-time-avg-value">
+								{screenTime === null || !hasUsage ? "—" : <DurationText seconds={weekAverage} />}
 							</span>
 						</div>
-						<div className="sys-media-body">
-							<span className="sys-media-title">
-								{media.active ? media.title || "Unknown track" : "No media playing"}
-							</span>
-							<span className="sys-media-artist">
-								{media.active
-									? media.artist || "Unknown artist"
-									: "Open a player app to control playback"}
-							</span>
-							<div className="sys-media-controls">
-								<button
-									type="button"
-									className="sys-media-btn"
-									onClick={onMediaPrev}
-									disabled={!media.active}
-									aria-label="Previous track"
-								>
-									<SkipBack size={14} />
-								</button>
-								<button
-									type="button"
-									className="sys-media-btn"
-									onClick={onTogglePlayPause}
-									disabled={!media.active}
-									aria-label={media.playing ? "Pause" : "Play"}
-								>
-									{media.playing ? <Pause size={14} /> : <Play size={14} />}
-								</button>
-								<button
-									type="button"
-									className="sys-media-btn"
-									onClick={onMediaNext}
-									disabled={!media.active}
-									aria-label="Next track"
-								>
-									<SkipForward size={14} />
-								</button>
+
+						<div
+							className="sys-time-scale"
+							aria-hidden={!hasUsage}
+							aria-label={
+								hasUsage
+									? `Average between lowest and highest days this week`
+									: undefined
+							}
+						>
+							<div className="sys-time-track">
+								<span className="sys-time-dot low" />
+								<span
+									className="sys-time-tick"
+									style={{
+										left: `calc(5.5px + (100% - 11px) * ${averagePct / 100})`
+									}}
+								/>
+								<span className="sys-time-dot high" />
+							</div>
+							<div className="sys-time-scale-labels">
+								<span>Lowest</span>
+								<span>Highest</span>
+							</div>
+						</div>
+
+						<div className="sys-time-extremes">
+							<div className="sys-time-stat">
+								<span className="sys-time-tag low">
+									<Triangle size={7} fill="currentColor" strokeWidth={0} className="down" />
+									Low
+								</span>
+								<span className="sys-time-stat-value">
+									{screenTime === null || !lowest || !hasUsage ? (
+										"—"
+									) : (
+										<DurationText seconds={lowest.seconds} />
+									)}
+								</span>
+								<span className="sys-time-stat-day">
+									{screenTime === null || !lowest || !hasUsage
+										? "—"
+										: weekdayCaption(lowest.key, todayKey)}
+								</span>
+							</div>
+							<div className="sys-time-stat">
+								<span className="sys-time-tag high">
+									<Triangle size={7} fill="currentColor" strokeWidth={0} />
+									High
+								</span>
+								<span className="sys-time-stat-value">
+									{screenTime === null || !highest || !hasUsage ? (
+										"—"
+									) : (
+										<DurationText seconds={highest.seconds} />
+									)}
+								</span>
+								<span className="sys-time-stat-day">
+									{screenTime === null || !highest || !hasUsage
+										? "—"
+										: weekdayCaption(highest.key, todayKey)}
+								</span>
 							</div>
 						</div>
 					</section>

@@ -48,7 +48,7 @@ import { deviceLookFor } from "./devices/deviceLooks";
 import type { BudLevel, BudsBattery } from "./devices/connectedDevices";
 import { ConnectedDevicesPanel } from "./components/ConnectedDevicesPanel";
 import { SCREEN_TIME_PANEL_HEIGHT, ScreenTimePanel } from "./components/ScreenTimePanel";
-import { SystemPanel } from "./components/SystemPanel";
+import { SYSTEM_PANEL_HEIGHT, SystemPanel } from "./components/SystemPanel";
 import { useConnectedDevices } from "./hooks/useConnectedDevices";
 import { isWiredAudio, usbArtFor, usbDisplayName, type UsbIdentity } from "./devices/usbArtFor";
 import type { DeviceArtKey } from "./devices/art";
@@ -3056,10 +3056,8 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 		// Screen Time: the collapsed dashboard plus whatever the Used Apps list
 		// needs, so the list pushes the notch down instead of overlaying it.
 		if (bloomMode === "screen-time") return SCREEN_TIME_PANEL_HEIGHT + screenTimeExtraHeight;
-		// System uses a 2x2 grid of equal 120px cards, so its notch is sized to
-		// the grid (38px header + 18px body padding + 247px grid) instead of
-		// reserving the taller Screen Time frame.
-		if (bloomMode === "system") return 303;
+		// System: Power, Network, Performance and the full-width Time summary.
+		if (bloomMode === "system") return SYSTEM_PANEL_HEIGHT;
 		if (bloomMode === "command-center") return isOpen ? 230 : 36;
 		if (bloomMode === "devices") {
 			return devicesPanelHeight;
@@ -4115,7 +4113,7 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 									)}
 								</AnimatePresence>
 
-								{/* System: battery, network, performance and audio. */}
+								{/* System: battery, network, performance and weekly time. */}
 								<AnimatePresence>
 									{bloomMode === "system" && (
 										<motion.div
@@ -4132,18 +4130,9 @@ const [networkWidget, setNetworkWidget] = useState<NetworkWidgetState | null>(nu
 												cpuUsage={cpuUsage}
 												ramUsage={ramUsage}
 												diskUsage={diskUsage}
-												media={{
-													title: mediaInfo.title,
-													artist: mediaInfo.artist,
-													playing: isPlaying,
-													active: mediaInfo.has_media
-												}}
 												netUpSpeed={netUpSpeed}
 												netDownSpeed={netDownSpeed}
 												network={networkWidget}
-												onMediaPrev={skipPrevious}
-												onMediaNext={skipNext}
-												onTogglePlayPause={togglePlayPause}
 												onRefreshBattery={refreshBatteryDetails}
 												onPrev={() => cyclePanel(-1)}
 												onNext={() => cyclePanel(1)}
