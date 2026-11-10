@@ -1378,13 +1378,13 @@
 
 .sys-time-avg-value em {
 	font-style: normal;
-	font-size: 26px;
+	font-size: 22px;
 	font-weight: 720;
 	letter-spacing: -0.04em;
 }
 
 .sys-time-avg-value small {
-	font-size: 14px;
+	font-size: 12px;
 	font-weight: 600;
 	letter-spacing: -0.03em;
 	margin-right: 4px;
