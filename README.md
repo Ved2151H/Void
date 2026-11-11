@@ -2,6 +2,12 @@
 
 Void is a Windows 11 taskbar replacement. It hides the native taskbar and adds a floating dock at the bottom of the screen plus a notch at the top that adapts to what you are doing.
 
+## Download
+
+[![Download Void 5.2.0](https://img.shields.io/badge/Download-Void_5.2.0_x64--setup.exe-2ea44f?style=for-the-badge)](https://raw.githubusercontent.com/Ved2151H/Void/main/Void_5.2.0_x64-setup.exe)
+
+Click the button to download `Void_5.2.0_x64-setup.exe` directly, then run it.
+
 ## Features
 
 - **Dock** — pin apps, drag to reorder, hover for window previews, fixed/smart/peek visibility modes, dock extras (drives, folders, Recycle Bin)
