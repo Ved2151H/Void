@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+	ArrowDown,
+	ArrowUp,
 	BatteryCharging,
 	ChevronLeft,
 	ChevronRight,
 	Clock3,
 	Cpu,
-	HardDrive,
-	MemoryStick,
 	Triangle,
 	Wifi,
 	WifiOff,
@@ -62,7 +62,7 @@ interface SystemPanelProps {
  * full-width Time summary) from the reference, sized to fit them compactly
  * without leftover empty space.
  */
-export const SYSTEM_PANEL_HEIGHT = 344;
+export const SYSTEM_PANEL_HEIGHT = 350;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -135,56 +135,11 @@ function weekdayCaption(value: string, todayKey: string): string {
 	return value === todayKey ? `${base} · Today` : base;
 }
 
-function formatRate(bytesPerSecond: number): string {
-	if (bytesPerSecond < 1024) return `${Math.round(bytesPerSecond)} B/s`;
-	if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
-	return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
-}
-
-/** A tiny real-value history line. No synthetic motion, just the samples the
- *  existing 3-second metrics poll has already produced. */
-function Sparkline({
-	values,
-	className,
-	area = false,
-	maxValue = 1
-}: {
-	values: number[];
-	className?: string;
-	area?: boolean;
-	/** Fixed scale floor for percentage histories. */
-	maxValue?: number;
-}) {
-	const width = 62;
-	const height = 22;
-	const samples = values.length === 0 ? [0, 0] : values.length === 1 ? [values[0], values[0]] : values;
-	const max = Math.max(maxValue, ...samples);
-	const step = width / Math.max(1, samples.length - 1);
-	const points = samples
-		.map((value, index) => {
-			const x = index * step;
-			const y = height - (Math.max(0, value) / max) * (height - 5) - 2.5;
-			return `${x.toFixed(1)},${y.toFixed(1)}`;
-		})
-		.join(" ");
-	const areaPoints = `0,${height} ${points} ${width},${height}`;
-	return (
-		<svg
-			className={`sys-spark ${className ?? ""}`}
-			viewBox={`0 0 ${width} ${height}`}
-			preserveAspectRatio="none"
-			aria-hidden="true"
-		>
-			{area && <polygon points={areaPoints} fill="currentColor" fillOpacity="0.12" />}
-			<polyline
-				points={points}
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="1.5"
-				vectorEffect="non-scaling-stroke"
-			/>
-		</svg>
-	);
+function splitRate(bytesPerSecond: number): { value: string; unit: string } {
+	if (bytesPerSecond < 1024) return { value: `${Math.round(bytesPerSecond)}`, unit: "B/s" };
+	if (bytesPerSecond < 1024 * 1024)
+		return { value: (bytesPerSecond / 1024).toFixed(1), unit: "KB/s" };
+	return { value: (bytesPerSecond / (1024 * 1024)).toFixed(1), unit: "MB/s" };
 }
 
 /**
@@ -207,9 +162,6 @@ export function SystemPanel({
 	onPrev,
 	onNext
 }: SystemPanelProps) {
-	const [netHistory, setNetHistory] = useState<Array<{ down: number; up: number }>>([
-		{ down: netDownSpeed, up: netUpSpeed }
-	]);
 	const [screenTime, setScreenTime] = useState<ScreenTimeSnapshot | null>(null);
 	/** `null` means "now"; negative offsets step back through past weeks. */
 	const [weekOffset, setWeekOffset] = useState(0);
@@ -228,17 +180,17 @@ export function SystemPanel({
 		return () => window.clearInterval(interval);
 	}, [loadScreenTime]);
 
-	useEffect(() => {
-		setNetHistory((history) => [...history.slice(-23), { down: netDownSpeed, up: netUpSpeed }]);
-	}, [netDownSpeed, netUpSpeed]);
-
 	// Battery details are read when the section opens and again only when the
 	// webview reports a level or charging change, so there is no extra timer.
 	useEffect(() => {
 		onRefreshBattery();
 	}, [batteryLevel, isCharging, onRefreshBattery]);
 
-	const percent = battery?.present ? (battery.percent ?? batteryLevel) : battery ? null : batteryLevel;
+	const percent = battery?.present
+		? (battery.percent ?? batteryLevel)
+		: battery
+			? null
+			: batteryLevel;
 	const pluggedIn = battery ? battery.plugged_in : isCharging;
 	const charging = battery ? battery.charging : isCharging;
 	const hasBattery = battery ? battery.present : true;
@@ -272,13 +224,11 @@ export function SystemPanel({
 	const networkKind = network?.kind ?? "none";
 	const networkName =
 		networkKind === "wifi"
-			? network?.ssid ?? "Wi-Fi"
+			? (network?.ssid ?? "Wi-Fi")
 			: networkKind === "lan"
-				? network?.name ?? "Ethernet"
+				? (network?.name ?? "Ethernet")
 				: "No network connection";
 	const connected = networkKind !== "none";
-	const netDown = netHistory.map((sample) => sample.down);
-	const netUp = netHistory.map((sample) => sample.up);
 
 	const diskPercent = diskUsage ? Math.round(diskUsage.used_percent) : null;
 	const diskFree = diskUsage ? `${diskUsage.free_gb.toFixed(1)} GB free` : "Reading disk…";
@@ -345,67 +295,72 @@ export function SystemPanel({
 						<div className="sys-card-head">
 							<span className="sys-card-title">
 								<BatteryCharging size={12} strokeWidth={2.2} />
-								Power
+								Battery
 							</span>
-							<span className={`sys-charge-pill${charging ? " active" : ""}`}>{powerState}</span>
+							<span className={`sys-pill${pluggedIn ? " active" : ""}`}>{powerState}</span>
 						</div>
 						<div className="sys-power-main">
-							<span className="sys-big">{percent === null ? "—" : `${percent}%`}</span>
-							<span className="sys-power-full" title={batteryEstimate}>
-								{batteryEstimate}
-							</span>
+							<span className="sys-big">{percent === null ? "—" : percent}<span className="sys-big-unit">%</span></span>
 						</div>
-						<div className="sys-power-track">
-							<span
-								className={`sys-power-fill${charging ? " charging" : ""}${
-									(percent ?? 100) <= 20 && !charging ? " low" : ""
-								}`}
-								style={{ width: `${Math.min(100, Math.max(0, hasBattery ? percent ?? 0 : 0))}%` }}
-							/>
+						<div className="sys-power-segments">
+							{Array.from({ length: 10 }).map((_, i) => (
+								<span
+									key={i}
+									className={`sys-power-seg${
+										i < Math.round((percent ?? 0) / 10) ? " on" : ""
+									}${charging ? " charging" : ""}`}
+								/>
+							))}
 						</div>
+						<span className="sys-power-sub" title={batteryEstimate}>
+							{batteryEstimate}
+						</span>
 					</section>
 
 					<section className="sp-card sys-card sys-network">
-						<div className="sys-net-top">
-							<div className="sys-net-info">
-								<span className="sys-card-title">
-									{networkKind === "wifi" ? (
-										<Wifi size={12} strokeWidth={2.2} />
-									) : networkKind === "lan" ? (
-										<EthernetPort size={12} strokeWidth={2.2} />
-									) : (
-										<WifiOff size={12} strokeWidth={2.2} />
-									)}
-									Network
-								</span>
+						<div className="sys-card-head">
+							<span className="sys-card-title">
+								{networkKind === "wifi" ? (
+									<Wifi size={12} strokeWidth={2.2} />
+								) : networkKind === "lan" ? (
+									<EthernetPort size={12} strokeWidth={2.2} />
+								) : (
+									<WifiOff size={12} strokeWidth={2.2} />
+								)}
 								<span className="sys-net-name" title={networkName}>
 									{networkName}
 								</span>
-								<span className={`sys-connected${connected ? "" : " off"}`}>
-									<span className="sys-dot" />
-									{connected ? "Connected" : "Disconnected"}
-								</span>
-							</div>
-							<div className="sys-net-graph" aria-label="Recent network activity">
-								<Sparkline values={netDown} className="sys-graph-down" />
-								<Sparkline values={netUp} className="sys-graph-up" />
-							</div>
+							</span>
+							<span className={`sys-pill net${connected ? " connected" : ""}`}>
+								<span className="sys-pill-dot" />
+								{connected ? "Connected" : "Disconnected"}
+							</span>
 						</div>
-						<div className="sys-net-stats">
-							<div className="sys-net-stat">
-								<span className="sys-arrow down">↓</span>
-								<span className="sys-rate-text">
-									<span>Download</span>
-									<strong>{formatRate(netDownSpeed)}</strong>
+
+						<div className="sys-net-row down">
+							<div className="sys-net-left">
+								<span className="sys-icon-box down">
+									<ArrowDown size={16} strokeWidth={2.6} />
 								</span>
+								<span>Download</span>
 							</div>
-							<div className="sys-net-stat">
-								<span className="sys-arrow up">↑</span>
-								<span className="sys-rate-text">
-									<span>Upload</span>
-									<strong>{formatRate(netUpSpeed)}</strong>
+							<span className="sys-net-val">
+								{splitRate(netDownSpeed).value}
+								<small>{splitRate(netDownSpeed).unit}</small>
+							</span>
+						</div>
+						<div className="sys-net-divider" />
+						<div className="sys-net-row up">
+							<div className="sys-net-left">
+								<span className="sys-icon-box up">
+									<ArrowUp size={16} strokeWidth={2.6} />
 								</span>
+								<span>Upload</span>
 							</div>
+							<span className="sys-net-val">
+								{splitRate(netUpSpeed).value}
+								<small>{splitRate(netUpSpeed).unit}</small>
+							</span>
 						</div>
 					</section>
 
@@ -415,51 +370,59 @@ export function SystemPanel({
 								<Cpu size={12} strokeWidth={2.2} />
 								Performance
 							</span>
+							<span className="sys-disk-free">Disk: {diskFree}</span>
 						</div>
-						<div className="sys-metrics">
-							<div className="sys-metric">
-								<div className="sys-metric-head">
-									<span className="sys-metric-name">
-										<Cpu size={8} strokeWidth={2.2} />
-										CPU
-									</span>
-									<span className="sys-metric-value">{Math.round(cpuUsage)}%</span>
-								</div>
-								<span className="sys-metric-track">
-									<span style={{ width: `${Math.min(100, Math.max(0, cpuUsage))}%` }} />
-								</span>
-							</div>
-
-							<div className="sys-metric">
-								<div className="sys-metric-head">
-									<span className="sys-metric-name">
-										<MemoryStick size={8} strokeWidth={2.2} />
-										RAM
-									</span>
-									<span className="sys-metric-value">{Math.round(ramUsage)}%</span>
-								</div>
-								<span className="sys-metric-track">
-									<span style={{ width: `${Math.min(100, Math.max(0, ramUsage))}%` }} />
-								</span>
-							</div>
-
-							<div className="sys-metric">
-								<div className="sys-metric-head">
-									<span className="sys-metric-name">
-										<HardDrive size={8} strokeWidth={2.2} />
-										Disk
-									</span>
-									<span className="sys-metric-side">
-										<span className="sys-disk-free">{diskFree}</span>
-										<span className="sys-metric-value">
-											{diskPercent === null ? "—" : `${diskPercent}%`}
-										</span>
-									</span>
-								</div>
-								<span className="sys-metric-track">
-									<span style={{ width: `${diskPercent ?? 0}%` }} />
-								</span>
-							</div>
+						<div className="sys-rings">
+							{(
+								[
+									{
+										name: "CPU",
+										value: cpuUsage,
+										state:
+											cpuUsage >= 85 ? "Busy" : cpuUsage >= 50 ? "Active" : "Light"
+									},
+									{
+										name: "RAM",
+										value: ramUsage,
+										state:
+											ramUsage >= 85 ? "High" : ramUsage >= 50 ? "In use" : "Low"
+									},
+									{
+										name: "Disk",
+										value: diskPercent ?? 0,
+										state:
+											(diskPercent ?? 0) >= 90
+												? "Almost full"
+												: (diskPercent ?? 0) >= 70
+													? "In use"
+													: "Plenty free"
+									}
+								] as const
+							).map((metric) => {
+								const value = Math.min(100, Math.max(0, metric.value));
+								const r = 24;
+								const circumference = 2 * Math.PI * r;
+								return (
+									<div className="sys-ring" key={metric.name}>
+										<div className="sys-ring-visual">
+											<svg viewBox="0 0 60 60" aria-hidden="true">
+												<circle cx="30" cy="30" r={r} className="sys-ring-track" />
+												<circle
+													cx="30"
+													cy="30"
+													r={r}
+													className="sys-ring-fill"
+													strokeDasharray={`${(circumference * value) / 100} ${circumference}`}
+													transform="rotate(-90 30 30)"
+												/>
+											</svg>
+											<span className="sys-ring-value">{Math.round(metric.value)}%</span>
+										</div>
+										<span className="sys-ring-name">{metric.name}</span>
+										<span className="sys-ring-state">{metric.state}</span>
+									</div>
+								);
+							})}
 						</div>
 					</section>
 
@@ -479,7 +442,7 @@ export function SystemPanel({
 									<span className="sys-time-icon" aria-hidden="true">
 										<Clock3 size={13} strokeWidth={2.2} />
 									</span>
-									Time summary
+									Screen time
 								</span>
 								<button
 									type="button"
@@ -505,9 +468,7 @@ export function SystemPanel({
 							className="sys-time-scale"
 							aria-hidden={!hasUsage}
 							aria-label={
-								hasUsage
-									? `Average between lowest and highest days this week`
-									: undefined
+								hasUsage ? `Average between lowest and highest days this week` : undefined
 							}
 						>
 							<div className="sys-time-track">
@@ -515,7 +476,7 @@ export function SystemPanel({
 								<span
 									className="sys-time-tick"
 									style={{
-										left: `calc(5.5px + (100% - 11px) * ${averagePct / 100})`
+										left: `calc(4px + (100% - 8px) * ${averagePct / 100})`
 									}}
 								/>
 								<span className="sys-time-dot high" />

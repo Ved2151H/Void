@@ -19,7 +19,11 @@
 	min-width: 0;
 	box-sizing: border-box;
 	color: var(--sp-text);
-	background-image: radial-gradient(circle at 50% -30%, rgba(110, 255, 100, 0.045), transparent 42%);
+	background-image: radial-gradient(
+		circle at 50% -30%,
+		rgba(110, 255, 100, 0.045),
+		transparent 42%
+	);
 	overflow: hidden;
 	border-radius: 0 0 18px 18px;
 	user-select: none;
@@ -124,6 +128,27 @@
 .sp-battery {
 	flex: none;
 	color: rgba(255, 255, 255, 0.82);
+}
+
+/* Reference top bar and deep black surface, applied to the System section
+   only so the Screen Time section keeps its own treatment. */
+.sp-root:has(.sys-body) {
+	background-color: #050606;
+	background-image: none;
+}
+
+.sp-root:has(.sys-body) .sp-header {
+	border-bottom-color: #242829;
+	background: #030404;
+}
+
+.sp-root:has(.sys-body) .sp-nav {
+	background: #111415;
+	color: #c5cacc;
+}
+
+.sp-root:has(.sys-body) .sp-nav:hover {
+	background: #171b1c;
 }
 
 /* Body and cards ---------------------------------------------------------- */
@@ -903,6 +928,90 @@
 
 .sys-body {
 	padding-top: 8px;
+	/* Reference palette, scoped to the System section so the Screen Time
+	   section keeps its own tokens. */
+	--sp-text: #f2f4f5;
+	--sp-muted: #a4aaad;
+	--sp-dim: #737a7e;
+	--sp-track: #303638;
+	--sp-green: #45e66f;
+	--sp-blue: #559cff;
+}
+
+/* Reference headline: large time, meridiem and date on the left, status pill
+   on the right. */
+.sp-headline {
+	flex: none;
+	height: 52px;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 0 2px;
+}
+
+.sp-datetime {
+	min-width: 0;
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+}
+
+.sp-big-clock {
+	font-size: 34px;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -0.045em;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	background: linear-gradient(180deg, #ffffff 40%, #d6dbdd 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+
+.sp-ampm {
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1;
+	letter-spacing: -0.01em;
+	color: #b9bec1;
+}
+
+.sp-date {
+	margin-left: 4px;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 9.5px;
+	color: #c0c5c7;
+}
+
+.sp-alert {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 10px;
+	border: 1px solid #3a3e3f;
+	border-radius: 999px;
+	background: #101313;
+	font-size: 8.5px;
+	font-weight: 650;
+	line-height: 1.2;
+	white-space: nowrap;
+	color: #f2f4f5;
+}
+
+.sp-alert-dot {
+	width: 6px;
+	height: 6px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--sp-green);
+	box-shadow: 0 0 8px rgba(69, 230, 111, 0.35);
 }
 
 .sys-grid {
@@ -910,10 +1019,10 @@
 	min-height: 0;
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	grid-template-rows: 1fr 1fr;
+	grid-template-rows: minmax(0, 0.78fr) minmax(0, 1fr);
 	align-content: start;
 	justify-content: stretch;
-	gap: 7px;
+	gap: 10px;
 }
 
 .sys-time {
@@ -927,6 +1036,10 @@
 	padding: 6px 8px 6px;
 	display: flex;
 	flex-direction: column;
+	border: 1px solid #303436;
+	border-radius: 16px;
+	background: linear-gradient(145deg, #0d1011, #090b0c 75%);
+	box-shadow: inset 0 1px 0 #ffffff08;
 }
 
 .sys-power {
@@ -956,12 +1069,12 @@
 	font-weight: 650;
 	line-height: 1.15;
 	white-space: nowrap;
-	color: var(--sp-text);
+	color: #e5e8e9;
 }
 
 .sys-card-title svg {
 	flex: none;
-	opacity: 0.82;
+	color: #c1c7ca;
 }
 
 .sys-spark {
@@ -971,23 +1084,23 @@
 	overflow: visible;
 }
 
-/* Power */
-.sys-charge-pill {
+/* Reference pill, used by the battery state. */
+.sys-pill {
 	flex: none;
 	padding: 2px 6px;
-	border: 1px solid rgba(255, 255, 255, 0.16);
+	border: 1px solid #414647;
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.045);
+	background: linear-gradient(180deg, #141819, #0d1011);
 	font-size: 6.6px;
 	font-weight: 600;
 	line-height: 1.2;
 	white-space: nowrap;
-	color: var(--sp-dim);
+	color: #c7ccce;
 }
 
-.sys-charge-pill.active {
-	border-color: rgba(114, 239, 100, 0.5);
-	background: rgba(70, 190, 65, 0.12);
+.sys-pill.active {
+	border-color: #235b36;
+	background: linear-gradient(180deg, #0d1a12, #0a130e);
 	color: var(--sp-green);
 }
 
@@ -1006,21 +1119,24 @@
 	letter-spacing: -0.055em;
 	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
-	color: var(--sp-text);
+	background: linear-gradient(180deg, #ffffff 35%, #d3d9db 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
 }
 
-.sys-power-full {
-	flex: 0 1 88px;
-	margin-bottom: 2px;
+/* Reference subtext sits under the battery bar, not beside the number. */
+.sys-power-sub {
+	flex: none;
+	width: 100%;
+	min-width: 0;
 	overflow: hidden;
-	text-align: right;
-	font-size: 6.7px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 7.4px;
 	font-weight: 500;
 	line-height: 1.3;
-	color: var(--sp-dim);
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
+	color: #aab0b3;
 }
 
 .sys-power-track {
@@ -1031,18 +1147,60 @@
 	overflow: hidden;
 	border-radius: 999px;
 	background: var(--sp-track);
+	/* Reference battery bar: ten blocks with even gaps, drawn by masking the
+	   track and its fill so no element is added. */
+	-webkit-mask-image: repeating-linear-gradient(
+		90deg,
+		#000 0 calc(10% - 2.5px),
+		transparent calc(10% - 2.5px) 10%
+	);
+	mask-image: repeating-linear-gradient(
+		90deg,
+		#000 0 calc(10% - 2.5px),
+		transparent calc(10% - 2.5px) 10%
+	);
 }
 
 .sys-power-fill {
 	display: block;
 	height: 100%;
 	border-radius: inherit;
-	background: linear-gradient(90deg, #ffffff, #e6e7e7);
+	background: #f0f2f3;
 	transition: width 0.35s ease;
 }
 
 .sys-power-fill.low {
 	background: var(--sp-red);
+}
+
+.sys-big-unit {
+	font-size: 0.45em;
+	font-weight: 600;
+	margin-left: 2px;
+	opacity: 0.8;
+}
+
+.sys-power-segments {
+	display: flex;
+	gap: 3px;
+	margin-top: 6px;
+	width: 100%;
+}
+
+.sys-power-seg {
+	flex: 1;
+	height: 6px;
+	border-radius: 3px;
+	background: var(--sp-track);
+	transition: background 0.25s ease;
+}
+
+.sys-power-seg.on {
+	background: #f0f2f3;
+}
+
+.sys-power-seg.on.charging {
+	background: var(--sp-green, #3be06a);
 }
 
 /* Network */
@@ -1080,7 +1238,7 @@
 	margin-top: 2px;
 	font-size: 7.1px;
 	font-weight: 500;
-	color: var(--sp-dim);
+	color: #b7bdc0;
 	white-space: nowrap;
 }
 
@@ -1114,7 +1272,7 @@
 }
 
 .sys-graph-down {
-	color: #42e83e;
+	color: var(--sp-green);
 	opacity: 0.9;
 }
 
@@ -1127,7 +1285,7 @@
 	flex: none;
 	margin-top: auto;
 	padding-top: 3px;
-	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	border-top: 1px solid #2f3436;
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1141,7 +1299,7 @@
 
 .sys-net-stat + .sys-net-stat {
 	padding-left: 7px;
-	border-left: 1px solid rgba(255, 255, 255, 0.12);
+	border-left: 1px solid #2f3436;
 }
 
 .sys-arrow {
@@ -1167,10 +1325,10 @@
 }
 
 .sys-rate-text span {
-	font-size: 6.6px;
+	font-size: 7.2px;
 	font-weight: 500;
 	line-height: 1.1;
-	color: var(--sp-dim);
+	color: #a9afb2;
 }
 
 .sys-rate-text strong {
@@ -1178,14 +1336,78 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 8.8px;
-	font-weight: 650;
-	line-height: 1.15;
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1.1;
 	font-variant-numeric: tabular-nums;
-	color: var(--sp-text);
+	color: #e9edef;
 }
 
 /* Performance */
+.sys-rings {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-around;
+	gap: 6px;
+	padding-top: 2px;
+}
+
+.sys-ring {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	min-width: 0;
+}
+
+.sys-ring-visual {
+	position: relative;
+	width: 46px;
+	height: 46px;
+}
+
+.sys-ring-visual svg {
+	width: 100%;
+	height: 100%;
+	transform: rotate(0deg);
+}
+
+.sys-ring-track,
+.sys-ring-fill {
+	fill: none;
+	stroke-width: 6;
+}
+
+.sys-ring-track {
+	stroke: #2f3436;
+}
+
+.sys-ring-fill {
+	stroke: #f0f2f3;
+	stroke-linecap: round;
+	transition: stroke-dasharray 0.35s ease;
+}
+
+.sys-ring-value {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: #f0f2f3;
+}
+
+.sys-ring-name {
+	font-size: 7px;
+	font-weight: 600;
+	color: #a9afb2;
+	letter-spacing: 0.02em;
+}
 .sys-metrics {
 	flex: 1;
 	min-height: 0;
@@ -1220,7 +1442,7 @@
 	font-weight: 600;
 	line-height: 1;
 	white-space: nowrap;
-	color: var(--sp-dim);
+	color: #b9bfc2;
 }
 
 .sys-metric-name svg {
@@ -1252,7 +1474,7 @@
 	display: block;
 	height: 100%;
 	border-radius: inherit;
-	background: #f1f2f2;
+	background: #f0f2f3;
 	transition: width 0.35s ease;
 }
 
@@ -1267,7 +1489,7 @@
 	flex: none;
 	font-size: 7px;
 	line-height: 1.2;
-	color: var(--sp-muted);
+	color: #aeb4b7;
 }
 
 /* Time summary — same-size square as the other system cards. */
@@ -1323,7 +1545,7 @@
 	font-size: 10px;
 	font-weight: 650;
 	line-height: 1.15;
-	color: var(--sp-text);
+	color: #e5e8e9;
 }
 
 .sys-time-icon {
@@ -1333,8 +1555,8 @@
 	display: grid;
 	place-items: center;
 	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.08);
-	color: #d7d9d9;
+	background: #171b1c;
+	color: #c1c7ca;
 }
 
 .sys-time-icon svg {
@@ -1364,7 +1586,7 @@
 	font-weight: 650;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
-	color: var(--sp-muted);
+	color: #92999c;
 }
 
 .sys-time-avg-value {
@@ -1373,7 +1595,10 @@
 	gap: 0;
 	font-variant-numeric: tabular-nums;
 	line-height: 1;
-	color: #f4f5f4;
+	background: linear-gradient(180deg, #ffffff 40%, #d6dbdd 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
 }
 
 .sys-time-avg-value em {
@@ -1388,6 +1613,7 @@
 	font-weight: 600;
 	letter-spacing: -0.03em;
 	margin-right: 4px;
+	color: #c8cdcf;
 	opacity: 0.92;
 }
 
@@ -1410,7 +1636,8 @@
 	height: 3px;
 	margin-top: -1.5px;
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.16);
+	background: linear-gradient(90deg, #3999ff, #4de8a0);
+	box-shadow: 0 0 12px rgba(58, 160, 255, 0.22);
 }
 
 .sys-time-dot {
@@ -1425,14 +1652,14 @@
 
 .sys-time-dot.low {
 	left: 0;
-	background: #3b9dff;
-	box-shadow: 0 0 0 3px rgba(59, 157, 255, 0.18);
+	background: var(--sp-blue);
+	box-shadow: 0 0 0 3px rgba(85, 156, 255, 0.2);
 }
 
 .sys-time-dot.high {
 	right: 0;
-	background: #6ee85c;
-	box-shadow: 0 0 0 3px rgba(110, 232, 92, 0.16);
+	background: var(--sp-green);
+	box-shadow: 0 0 0 3px rgba(69, 230, 111, 0.16);
 }
 
 .sys-time-tick {
@@ -1442,7 +1669,8 @@
 	height: 14px;
 	margin-top: -7px;
 	border-radius: 2px;
-	background: #f4f5f4;
+	background: linear-gradient(180deg, #ffffff, #e6e9ea);
+	box-shadow: 0 0 10px rgba(255, 255, 255, 0.22);
 	transform: translateX(-50%);
 }
 
@@ -1473,8 +1701,8 @@
 	justify-content: center;
 	gap: 2px;
 	border-radius: 10px;
-	border: 1px solid rgba(255, 255, 255, 0.08);
-	background: rgba(255, 255, 255, 0.035);
+	border: 1px solid #2a2e30;
+	background: linear-gradient(145deg, #111415, #0b0d0e);
 }
 
 .sys-time-tag {
@@ -1498,7 +1726,7 @@
 }
 
 .sys-time-tag.low {
-	color: #4aa6ff;
+	color: var(--sp-blue);
 }
 
 .sys-time-tag.high {
@@ -1538,10 +1766,685 @@
 	color: var(--sp-muted);
 }
 
+/* ============================================================
+   System panel — reference dashboard look
+   ============================================================ */
+
+.sys-body {
+	padding-top: 10px;
+	--sp-text: #ffffff;
+	--sp-muted: #d4d4d4;
+	--sp-dim: #a4aaad;
+	--sp-track: #2b2b2b;
+	--sp-green: #3be06a;
+	--sp-cyan: #19e3e0;
+	--sp-blue: #2d8cff;
+}
+
+.sys-grid {
+	gap: 10px;
+}
+
+.sys-card {
+	padding: 9px 11px 9px;
+	border: 1px solid #262626;
+	border-radius: 20px;
+	background: linear-gradient(180deg, #0d0d0d 0%, #090909 100%);
+	box-shadow: none;
+	overflow: hidden;
+}
+
+.sys-card-title {
+	font-size: 11px;
+	font-weight: 600;
+	color: #ffffff;
+}
+
+.sys-card-title svg {
+	color: #ffffff;
+}
+
+.sys-big {
+	font-size: 34px;
+	font-weight: 700;
+	letter-spacing: -0.04em;
+}
+
+.sys-big-unit {
+	font-size: 0.42em;
+	font-weight: 600;
+	margin-left: 2px;
+	opacity: 0.85;
+}
+
+.sys-power-seg {
+	height: 8px;
+	border-radius: 4px;
+	background: #2b2b2b;
+}
+
+.sys-power-seg.on {
+	background: #ffffff;
+}
+
+.sys-power-sub {
+	font-size: 8.5px;
+	color: var(--sp-muted);
+}
+
+.sys-pill {
+	height: auto;
+	padding: 3px 9px;
+	border-radius: 999px;
+	border: 1px solid #3a3a3a;
+	background: #0b0b0b;
+	font-size: 8px;
+	font-weight: 500;
+	color: var(--sp-muted);
+}
+
+.sys-pill.active {
+	color: var(--sp-muted);
+	border-color: #3a3a3a;
+	background: #0b0b0b;
+}
+
+/* Network card: reference Wi-Fi rows */
+.sys-network {
+	justify-content: flex-start;
+	gap: 0;
+}
+
+.sys-pill.net {
+	gap: 5px;
+}
+
+.sys-pill.net.connected {
+	color: var(--sp-green);
+	border-color: #1f3a27;
+	background: #0a130d;
+}
+
+.sys-pill-dot {
+	width: 6px;
+	height: 6px;
+	flex: none;
+	border-radius: 50%;
+	background: var(--sp-green);
+}
+
+.sys-net-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sys-net-row {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.sys-net-row.down {
+	margin-top: 6px;
+}
+
+.sys-net-left {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--sp-muted);
+	min-width: 0;
+}
+
+.sys-icon-box {
+	width: 30px;
+	height: 28px;
+	flex: none;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.sys-icon-box.down {
+	background: #0e2a30;
+	color: var(--sp-cyan);
+}
+
+.sys-icon-box.up {
+	background: #0f2340;
+	color: var(--sp-blue);
+}
+
+.sys-net-val {
+	flex: none;
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	font-variant-numeric: tabular-nums;
+	color: #ffffff;
+	white-space: nowrap;
+}
+
+.sys-net-val small {
+	font-size: 9px;
+	font-weight: 400;
+	margin-left: 3px;
+	letter-spacing: 0;
+	color: var(--sp-muted);
+}
+
+.sys-net-divider {
+	height: 1px;
+	flex: none;
+	margin: 2px 0;
+	background: #2a2a2a;
+}
+
+/* Performance rings */
+.sys-rings {
+	gap: 8px;
+	padding-top: 6px;
+}
+
+.sys-ring {
+	gap: 4px;
+}
+
+.sys-ring-visual {
+	width: 58px;
+	height: 58px;
+}
+
+.sys-ring-track,
+.sys-ring-fill {
+	stroke-width: 5;
+}
+
+.sys-ring-track {
+	stroke: #262626;
+}
+
+.sys-ring-fill {
+	stroke: #ffffff;
+}
+
+.sys-ring-value {
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.sys-ring-name {
+	font-size: 9px;
+	font-weight: 600;
+	color: #ffffff;
+	letter-spacing: 0;
+}
+
+.sys-ring-state {
+	font-size: 7.5px;
+	font-weight: 500;
+	color: var(--sp-muted);
+	text-align: center;
+	line-height: 1.1;
+}
+
+/* Screen time card */
+.sys-time-avg-label {
+	font-size: 9px;
+	color: var(--sp-muted);
+}
+
+.sys-time-avg-value {
+	font-size: 30px;
+	font-weight: 700;
+	letter-spacing: -0.03em;
+}
+
+.sys-time-avg-value em {
+	font-style: normal;
+}
+
+.sys-time-avg-value small {
+	font-size: 0.44em;
+	font-weight: 500;
+	margin: 0 3px 0 1px;
+	color: var(--sp-muted);
+}
+
+.sys-time-track {
+	height: 10px;
+	border-radius: 999px;
+	background: linear-gradient(90deg, #3a8dff 0%, #35d5ee 45%, #43e0b4 62%, #3ee06c 100%);
+}
+
+.sys-time-tick {
+	width: 4px;
+	background: #ffffff;
+}
+
+/* Compact pass: tighten all four cards so they fit the panel without clipping. */
+.sys-body {
+	padding-top: 5px;
+}
+
+.sys-grid {
+	gap: 4px;
+	grid-template-rows: minmax(0, 0.8fr) minmax(0, 1fr);
+}
+
+.sys-card {
+	padding: 3px 10px;
+	border-radius: 13px;
+}
+
+.sys-card-title {
+	font-size: 11px;
+}
+
+.sys-card-title svg {
+	width: 10px;
+	height: 10px;
+}
+
+.sys-big {
+	font-size: 27px;
+}
+
+.sys-power-seg {
+	height: 5px;
+	border-radius: 2px;
+}
+
+.sys-power-segments {
+	gap: 2px;
+	margin-top: 2px;
+}
+
+.sys-power-sub {
+	font-size: 9px;
+}
+
+.sys-pill {
+	padding: 1px 6px;
+	font-size: 8px;
+}
+
+.sys-pill-dot {
+	width: 5px;
+	height: 5px;
+}
+
+.sys-net-row.down {
+	margin-top: 1px;
+}
+
+.sys-net-left {
+	gap: 6px;
+	font-size: 10px;
+}
+
+.sys-icon-box {
+	width: 24px;
+	height: 20px;
+	border-radius: 6px;
+}
+
+.sys-icon-box svg {
+	width: 12px;
+	height: 12px;
+}
+
+.sys-net-val {
+	font-size: 20px;
+}
+
+.sys-net-val small {
+	font-size: 9px;
+}
+
+.sys-net-divider {
+	margin: 0;
+}
+
+.sys-rings {
+	padding-top: 1px;
+	gap: 5px;
+}
+
+.sys-ring {
+	gap: 1px;
+}
+
+.sys-ring-visual {
+	width: 42px;
+	height: 42px;
+}
+
+.sys-ring-value {
+	font-size: 13px;
+}
+
+.sys-ring-name {
+	font-size: 9px;
+}
+
+.sys-ring-state {
+	font-size: 8px;
+}
+
+/* Screen time */
+.sys-time-head {
+	min-height: 10px;
+}
+
+.sys-time-title {
+	font-size: 11px;
+}
+
+.sys-time-avg-block {
+	margin-top: 0;
+	gap: 0;
+}
+
+.sys-time-avg-label {
+	font-size: 9px;
+}
+
+.sys-time-avg-value em {
+	font-size: 22px;
+}
+
+.sys-time-avg-value small {
+	font-size: 11px;
+	margin-right: 2px;
+}
+
+.sys-time-scale {
+	margin-top: 0;
+}
+
+.sys-time-track {
+	height: 11px;
+	background: none;
+	border-radius: 0;
+}
+
+.sys-time-track::before {
+	left: 0;
+	right: 0;
+	height: 6px;
+	margin-top: -3px;
+	background: linear-gradient(90deg, #3a8dff 0%, #35d5ee 45%, #43e0b4 62%, #3ee06c 100%);
+	box-shadow: none;
+}
+
+.sys-time-dot {
+	width: 8px;
+	height: 8px;
+	margin-top: -4px;
+}
+
+.sys-time-tick {
+	width: 2px;
+	height: 9px;
+	margin-top: -4.5px;
+}
+
+.sys-time-scale-labels {
+	font-size: 9px;
+	margin-top: 0;
+}
+
+.sys-time-extremes {
+	gap: 8px;
+	margin-top: 0;
+}
+
+.sys-time-stat {
+	padding: 0;
+	gap: 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+}
+
+/* Low sits on the left edge, High on the right edge. */
+.sys-time-stat:first-child {
+	align-items: flex-start;
+	text-align: left;
+}
+
+.sys-time-stat:last-child {
+	align-items: flex-end;
+	text-align: right;
+}
+
+.sys-time-tag {
+	font-size: 9px;
+}
+
+.sys-time-stat-value em {
+	font-size: 16px;
+}
+
+.sys-time-stat-value small {
+	font-size: 10px;
+}
+
+.sys-time-stat-day {
+	font-size: 9px;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.st-bar,
 	.sys-power-fill,
 	.sys-metric-track > span {
 		transition: none;
 	}
+}
+
+/* Final refinement pass: tighten vertical spacing, guarantee no clipping or
+   overlap, and pin the screen-time LOW/HIGH stats to the card's edges. */
+.sp-body {
+	gap: 5px;
+	padding: 4px 12px 8px;
+}
+
+.sys-body {
+	padding-top: 4px;
+}
+
+.sys-card {
+	padding: 3px 10px;
+	gap: 2px;
+}
+
+.sys-card-head {
+	min-height: 12px;
+	gap: 6px;
+}
+
+/* Battery: pull the number, segments and note closer together. */
+.sys-power-main {
+	margin-top: 2px;
+	gap: 5px;
+}
+
+.sys-big {
+	line-height: 1.05;
+}
+
+.sys-power-segments {
+	margin-top: 3px;
+}
+
+.sys-power-sub {
+	margin-top: 2px;
+	width: auto;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* Network: rows must never overflow their half of the card. */
+.sys-net-row {
+	gap: 6px;
+	min-height: 18px;
+	flex: 1 1 0;
+}
+
+.sys-net-val {
+	line-height: 1;
+	max-width: 55%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sys-net-left {
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* Performance: rings sit centred, never clipped. */
+.sys-rings {
+	min-height: 0;
+	padding-top: 2px;
+	gap: 5px;
+}
+
+.sys-ring {
+	min-width: 0;
+}
+
+/* Screen time: LOW hugs the left edge, HIGH hugs the right edge. */
+.sys-time-extremes {
+	width: 100%;
+	min-height: 0;
+	gap: 10px;
+}
+
+.sys-time-stat {
+	min-width: 0;
+	gap: 1px;
+}
+
+.sys-time-stat:first-child {
+	align-items: flex-start;
+	text-align: left;
+}
+
+.sys-time-stat:last-child {
+	align-items: flex-end;
+	text-align: right;
+}
+
+.sys-time-stat-value,
+.sys-time-stat-value em {
+	max-width: 100%;
+	white-space: nowrap;
+}
+
+/* ============================================================
+   Final pass — compact, balanced, edge-aligned. Rows still share
+   the panel, but each card now distributes its slack evenly so no
+   card shows a blank band.
+   ============================================================ */
+
+/* Rows: keep the top row slightly shorter, as in the reference. */
+.sys-grid {
+	grid-template-rows: minmax(0, 0.82fr) minmax(0, 1fr);
+	gap: 5px;
+}
+
+/* Battery: one connected block, left aligned. */
+.sys-power {
+	justify-content: space-evenly;
+	gap: 0;
+}
+
+.sys-power-main {
+	justify-content: flex-start;
+	align-items: baseline;
+	gap: 0;
+	margin-top: 0;
+}
+
+.sys-big {
+	line-height: 1;
+}
+
+.sys-power-segments {
+	margin-top: 0;
+	width: 100%;
+}
+
+.sys-power-sub {
+	margin-top: 0;
+	flex: none;
+	width: 100%;
+}
+
+/* Network: two even rows around a centred divider. */
+.sys-network {
+	justify-content: space-evenly;
+	gap: 0;
+}
+
+.sys-net-row.down {
+	margin-top: 0;
+}
+
+.sys-net-divider {
+	align-self: stretch;
+}
+
+/* Performance: rings centred in the leftover space. */
+.sys-perf {
+	justify-content: space-evenly;
+	gap: 0;
+}
+
+.sys-rings {
+	flex: none;
+	padding-top: 0;
+}
+
+/* Screen time: blocks distributed evenly with breathing room between rows. */
+.sys-time {
+	justify-content: space-evenly;
+	gap: 4px;
+}
+
+.sys-time-avg-block,
+.sys-time-scale,
+.sys-time-extremes {
+	margin-top: 0;
+}
+
+.sys-time-avg-block {
+	margin-top: 2px;
+}
+
+.sys-time-scale {
+	margin-top: 3px;
+}
+
+.sys-time-extremes {
+	margin-top: 3px;
+	align-items: start;
+}
+
+.sys-time-stat {
+	justify-content: flex-start;
+}
+
+.sys-time-stat-value {
+	line-height: 1.05;
 }
