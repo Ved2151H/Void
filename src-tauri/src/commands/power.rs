@@ -22,7 +22,7 @@ fn radio_states_sync() -> Result<SavedRadios, String> {
         );
     }
     let radios = Radio::GetRadiosAsync()
-        .and_then(|op| op.get())
+        .and_then(|op| op.join())
         .map_err(|e| e.to_string())?;
     let mut states = Vec::new();
     for i in 0..radios.Size().unwrap_or(0) {

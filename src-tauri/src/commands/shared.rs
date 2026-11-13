@@ -203,7 +203,7 @@ pub(crate) fn set_radio_state_sync(
         );
     }
     let radios = Radio::GetRadiosAsync()
-        .and_then(|op| op.get())
+        .and_then(|op| op.join())
         .map_err(|e| e.to_string())?;
     for i in 0..radios.Size().unwrap_or(0) {
         if let Ok(radio) = radios.GetAt(i) {
@@ -213,7 +213,7 @@ pub(crate) fn set_radio_state_sync(
                 } else {
                     RadioState::Off
                 };
-                let _ = radio.SetStateAsync(target).and_then(|op| op.get());
+                let _ = radio.SetStateAsync(target).and_then(|op| op.join());
                 return Ok(());
             }
         }

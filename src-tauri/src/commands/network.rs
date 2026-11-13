@@ -30,7 +30,7 @@ fn get_radio_state_sync(kind: windows::Devices::Radios::RadioKind) -> Result<boo
         );
     }
     let radios = Radio::GetRadiosAsync()
-        .and_then(|op| op.get())
+        .and_then(|op| op.join())
         .map_err(|e| e.to_string())?;
     for i in 0..radios.Size().unwrap_or(0) {
         if let Ok(radio) = radios.GetAt(i) {
@@ -153,7 +153,7 @@ fn set_hotspot_state_sync(enabled: bool) -> Result<bool, String> {
         };
         let result = operation
             .map_err(|e| e.to_string())?
-            .get()
+            .join()
             .map_err(|e| e.to_string())?;
         let status = result.Status().map_err(|e| e.to_string())?;
         if status != TetheringOperationStatus::Success {

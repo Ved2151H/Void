@@ -32,5 +32,5 @@ Run from the repo root unless noted. Bun 1.4.0, Rust stable.
 ## Gotchas
 
 - The app hides the native Windows taskbar and registers AppBars while running. Any new exit/restart path must restore the taskbar and unregister AppBars, like the tray menu in `main.rs` does. A marker file restores it after a crash
-- The `windows` crate is pinned to 0.61 with an explicit feature list in `Cargo.toml`; add features there when using new Win32 APIs
+- The `windows` crate is pinned to 0.62 (matched to tauri 2.12 / tao 0.37) with an explicit feature list in `Cargo.toml`; add features there when using new Win32 APIs. Keep `windows-core`/`windows-collections`/`webview2-com` on the versions that pair with it
 - Commits follow conventional commits (`feat:`, `fix:`); release notes are generated from them and commits touching only `website/*`, `.github/*`, or `*.md` are filtered out

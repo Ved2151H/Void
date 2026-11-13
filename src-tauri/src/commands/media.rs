@@ -40,7 +40,7 @@ pub fn open_media_source_app() {
         };
 
         let mgr = match GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
         {
             Ok(m) => m,
             Err(_) => return,
