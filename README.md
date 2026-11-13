@@ -4,9 +4,9 @@ Void is a Windows 11 taskbar replacement. It hides the native taskbar and adds a
 
 ## Download
 
-[![Download Void 5.2.0](https://img.shields.io/badge/Download-Void_5.2.0_x64--setup.exe-2ea44f?style=for-the-badge)](https://raw.githubusercontent.com/Ved2151H/Void/main/Void_5.2.0_x64-setup.exe)
+[![Download Void 5.2.1](https://img.shields.io/badge/Download-Void_5.2.1_x64--setup.exe-2ea44f?style=for-the-badge)](https://raw.githubusercontent.com/Ved2151H/Void/main/Void_5.2.1_x64-setup.exe)
 
-Click the button to download `Void_5.2.0_x64-setup.exe` directly, then run it.
+Click the button to download `Void_5.2.1_x64-setup.exe` directly, then run it.
 
 ## Features
 
